@@ -7141,6 +7141,11 @@ function Library:CreateWindow(WindowInfo)
             local GroupboxContainer
             local GroupboxList
 
+            -- Variables added for collapsing feature
+            local HeaderLine
+            local HeaderButton
+            local ArrowImage
+
             do
                 GroupboxHolder = New("Frame", {
                     BackgroundColor3 = "BackgroundColor",
@@ -7156,9 +7161,32 @@ function Library:CreateWindow(WindowInfo)
                 )
                 Library:AddOutline(GroupboxHolder)
 
-                Library:MakeLine(GroupboxHolder, {
+                -- Assigned to a variable so we can hide it when collapsed
+                HeaderLine = Library:MakeLine(GroupboxHolder, {
                     Position = UDim2.fromOffset(0, 34),
                     Size = UDim2.new(1, 0, 0, 1),
+                })
+
+                -- Invisible button over the header
+                HeaderButton = New("TextButton", {
+                    BackgroundTransparency = 1,
+                    Size = UDim2.new(1, 0, 0, 34),
+                    Text = "",
+                    ZIndex = 2,
+                    Parent = GroupboxHolder,
+                })
+
+                -- Arrow icon on the right
+                ArrowImage = New("ImageLabel", {
+                    AnchorPoint = Vector2.new(1, 0.5),
+                    Image = ArrowIcon and ArrowIcon.Url or "",
+                    ImageColor3 = "FontColor",
+                    ImageRectOffset = ArrowIcon and ArrowIcon.ImageRectOffset or Vector2.zero,
+                    ImageRectSize = ArrowIcon and ArrowIcon.ImageRectSize or Vector2.zero,
+                    ImageTransparency = 0.5,
+                    Position = UDim2.new(1, -12, 0, 17), -- Center vertically, 12px padding from right
+                    Size = UDim2.fromOffset(16, 16),
+                    Parent = GroupboxHolder,
                 })
 
                 local BoxIcon = Library:GetCustomIcon(Info.IconName)
@@ -7177,7 +7205,7 @@ function Library:CreateWindow(WindowInfo)
                 GroupboxLabel = New("TextLabel", {
                     BackgroundTransparency = 1,
                     Position = UDim2.fromOffset(BoxIcon and 24 or 0, 0),
-                    Size = UDim2.new(1, 0, 0, 34),
+                    Size = UDim2.new(1, -34, 0, 34), -- Shrunk size so text doesn't overlap the arrow
                     Text = Info.Name,
                     TextSize = 15,
                     TextXAlignment = Enum.TextXAlignment.Left,
@@ -7213,14 +7241,40 @@ function Library:CreateWindow(WindowInfo)
                 BoxHolder = BoxHolder,
                 Holder = GroupboxHolder,
                 Container = GroupboxContainer,
+                
+                Collapsed = false, -- Track state
 
                 Tab = Tab,
                 DependencyBoxes = {},
                 Elements = {},
             }
 
+            -- Toggles visibility, rotates arrow, and adjusts height
+            function Groupbox:SetCollapsed(State)
+                Groupbox.Collapsed = State
+                GroupboxContainer.Visible = not State
+                HeaderLine.Visible = not State
+                
+                TweenService:Create(ArrowImage, Library.TweenInfo, {
+                    Rotation = State and 180 or 0 -- Flips the chevron icon upside down
+                }):Play()
+
+                Groupbox:Resize()
+            end
+
+            -- Click event for the header
+            HeaderButton.MouseButton1Click:Connect(function()
+                Groupbox:SetCollapsed(not Groupbox.Collapsed)
+            end)
+
             function Groupbox:Resize()
-                GroupboxHolder.Size = UDim2.new(1, 0, 0, (GroupboxList.AbsoluteContentSize.Y / Library.DPIScale) + 49)
+                if Groupbox.Collapsed then
+                    -- If closed, constrain to header height (34px)
+                    GroupboxHolder.Size = UDim2.new(1, 0, 0, 34)
+                else
+                    -- If open, scale based on the list layout of contents
+                    GroupboxHolder.Size = UDim2.new(1, 0, 0, (GroupboxList.AbsoluteContentSize.Y / Library.DPIScale) + 49)
+                end
             end
 
             setmetatable(Groupbox, BaseGroupbox)
