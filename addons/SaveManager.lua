@@ -438,11 +438,11 @@ local SaveManager = {} do
 
             local success, err = self:Save(name)
             if not success then
-                self.Library:Notify("Failed to overwrite config: " .. err)
+                self.Library:Notify("Failed to save config: " .. err)
                 return
             end
 
-            self.Library:Notify(string.format("Overwrote config %q", name))
+            self.Library:Notify(string.format("Saved config %q", name))
         end)
         ButtonG1:AddButton("Load", function()
             local name = self.Library.Options.SaveManager_ConfigList.Value
