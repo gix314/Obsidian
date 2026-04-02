@@ -426,19 +426,19 @@ do
             "ThemeManager_CustomThemeList",
             { Text = "Custom themes", Values = self:ReloadCustomThemes(), AllowNull = true, Default = 1 }
         )
-        groupbox:AddButton("Load theme", function()
+        local ButtonG1 = groupbox:AddButton("Load", function()
             local name = self.Library.Options.ThemeManager_CustomThemeList.Value
 
             self:ApplyTheme(name)
             self.Library:Notify(string.format("Loaded theme %q", name))
         end)
-        groupbox:AddButton("Overwrite theme", function()
+        ButtonG1:AddButton("Save", function()
             local name = self.Library.Options.ThemeManager_CustomThemeList.Value
 
             self:SaveCustomTheme(name)
-            self.Library:Notify(string.format("Overwrote config %q", name))
+            self.Library:Notify(string.format("Saved config %q", name))
         end)
-        groupbox:AddButton("Delete theme", function()
+        local ButtonG2 = groupbox:AddButton("Delete", function()
             local name = self.Library.Options.ThemeManager_CustomThemeList.Value
 
             local success, err = self:Delete(name)
@@ -451,11 +451,11 @@ do
             self.Library.Options.ThemeManager_CustomThemeList:SetValues(self:ReloadCustomThemes())
             self.Library.Options.ThemeManager_CustomThemeList:SetValue(nil)
         end)
-        groupbox:AddButton("Refresh list", function()
+        ButtonG2:AddButton("Refresh", function()
             self.Library.Options.ThemeManager_CustomThemeList:SetValues(self:ReloadCustomThemes())
             self.Library.Options.ThemeManager_CustomThemeList:SetValue(nil)
         end)
-        groupbox:AddButton("Set as default", function()
+        local ButtonG3 = groupbox:AddButton("Set Default", function()
             if
                 self.Library.Options.ThemeManager_CustomThemeList.Value ~= nil
                 and self.Library.Options.ThemeManager_CustomThemeList.Value ~= ""
@@ -466,7 +466,7 @@ do
                 )
             end
         end)
-        groupbox:AddButton("Reset default", function()
+        ButtonG3:AddButton("Reset Default", function()
             local success = pcall(delfile, self.Folder .. "/themes/default.txt")
             if not success then
                 self.Library:Notify("Failed to reset default: delete file error")
