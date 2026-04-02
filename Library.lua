@@ -7144,9 +7144,6 @@ function Library:CreateWindow(WindowInfo)
             local HeaderLine
             local HeaderButton
             local ArrowImage
-            
-            -- Grab the default collapsed state from Info
-            local IsCollapsed = Info.Collapsed == true
 
             do
                 GroupboxHolder = New("Frame", {
@@ -7167,7 +7164,6 @@ function Library:CreateWindow(WindowInfo)
                     Position = UDim2.fromOffset(0, 34),
                     Size = UDim2.new(1, 0, 0, 1),
                 })
-                HeaderLine.Visible = not IsCollapsed -- Set initial visibility
 
                 HeaderButton = New("TextButton", {
                     BackgroundTransparency = 1,
@@ -7186,7 +7182,6 @@ function Library:CreateWindow(WindowInfo)
                     ImageTransparency = 0.5,
                     Position = UDim2.new(1, -12, 0, 17),
                     Size = UDim2.fromOffset(16, 16),
-                    Rotation = IsCollapsed and 180 or 0, -- Set initial rotation
                     Parent = GroupboxHolder,
                 })
 
@@ -7222,7 +7217,6 @@ function Library:CreateWindow(WindowInfo)
                     BackgroundTransparency = 1,
                     Position = UDim2.fromOffset(0, 35),
                     Size = UDim2.new(1, 0, 1, -35),
-                    Visible = not IsCollapsed, -- Set initial visibility
                     Parent = GroupboxHolder,
                 })
 
@@ -7244,7 +7238,7 @@ function Library:CreateWindow(WindowInfo)
                 Holder = GroupboxHolder,
                 Container = GroupboxContainer,
                 
-                Collapsed = IsCollapsed, -- Track state
+                Collapsed = false,
 
                 Tab = Tab,
                 DependencyBoxes = {},
@@ -7277,18 +7271,25 @@ function Library:CreateWindow(WindowInfo)
 
             setmetatable(Groupbox, BaseGroupbox)
 
+            -- Apply initial state (No argument/false = Collapsed. True = Opened).
+            local IsOpened = Info.Opened == true 
+            Groupbox.Collapsed = not IsOpened
+            GroupboxContainer.Visible = IsOpened
+            HeaderLine.Visible = IsOpened
+            ArrowImage.Rotation = IsOpened and 0 or 180
+
             Groupbox:Resize()
             Tab.Groupboxes[Info.Name] = Groupbox
 
             return Groupbox
         end
 
-        function Tab:AddLeftGroupbox(Name, IconName, Collapsed)
-            return Tab:AddGroupbox({ Side = 1, Name = Name, IconName = IconName, Collapsed = Collapsed })
+        function Tab:AddLeftGroupbox(Name, IconName, Opened)
+            return Tab:AddGroupbox({ Side = 1, Name = Name, IconName = IconName, Opened = Opened })
         end
 
-        function Tab:AddRightGroupbox(Name, IconName, Collapsed)
-            return Tab:AddGroupbox({ Side = 2, Name = Name, IconName = IconName, Collapsed = Collapsed })
+        function Tab:AddRightGroupbox(Name, IconName, Opened)
+            return Tab:AddGroupbox({ Side = 2, Name = Name, IconName = IconName, Opened = Opened })
         end
 
         function Tab:AddTabbox(Info)
