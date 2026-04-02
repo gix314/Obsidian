@@ -7141,10 +7141,12 @@ function Library:CreateWindow(WindowInfo)
             local GroupboxContainer
             local GroupboxList
 
-            -- Variables added for collapsing feature
             local HeaderLine
             local HeaderButton
             local ArrowImage
+            
+            -- Grab the default collapsed state from Info
+            local IsCollapsed = Info.Collapsed == true
 
             do
                 GroupboxHolder = New("Frame", {
@@ -7161,13 +7163,12 @@ function Library:CreateWindow(WindowInfo)
                 )
                 Library:AddOutline(GroupboxHolder)
 
-                -- Assigned to a variable so we can hide it when collapsed
                 HeaderLine = Library:MakeLine(GroupboxHolder, {
                     Position = UDim2.fromOffset(0, 34),
                     Size = UDim2.new(1, 0, 0, 1),
                 })
+                HeaderLine.Visible = not IsCollapsed -- Set initial visibility
 
-                -- Invisible button over the header
                 HeaderButton = New("TextButton", {
                     BackgroundTransparency = 1,
                     Size = UDim2.new(1, 0, 0, 34),
@@ -7176,7 +7177,6 @@ function Library:CreateWindow(WindowInfo)
                     Parent = GroupboxHolder,
                 })
 
-                -- Arrow icon on the right
                 ArrowImage = New("ImageLabel", {
                     AnchorPoint = Vector2.new(1, 0.5),
                     Image = ArrowIcon and ArrowIcon.Url or "",
@@ -7184,8 +7184,9 @@ function Library:CreateWindow(WindowInfo)
                     ImageRectOffset = ArrowIcon and ArrowIcon.ImageRectOffset or Vector2.zero,
                     ImageRectSize = ArrowIcon and ArrowIcon.ImageRectSize or Vector2.zero,
                     ImageTransparency = 0.5,
-                    Position = UDim2.new(1, -12, 0, 17), -- Center vertically, 12px padding from right
+                    Position = UDim2.new(1, -12, 0, 17),
                     Size = UDim2.fromOffset(16, 16),
+                    Rotation = IsCollapsed and 180 or 0, -- Set initial rotation
                     Parent = GroupboxHolder,
                 })
 
@@ -7205,7 +7206,7 @@ function Library:CreateWindow(WindowInfo)
                 GroupboxLabel = New("TextLabel", {
                     BackgroundTransparency = 1,
                     Position = UDim2.fromOffset(BoxIcon and 24 or 0, 0),
-                    Size = UDim2.new(1, -34, 0, 34), -- Shrunk size so text doesn't overlap the arrow
+                    Size = UDim2.new(1, -34, 0, 34),
                     Text = Info.Name,
                     TextSize = 15,
                     TextXAlignment = Enum.TextXAlignment.Left,
@@ -7221,6 +7222,7 @@ function Library:CreateWindow(WindowInfo)
                     BackgroundTransparency = 1,
                     Position = UDim2.fromOffset(0, 35),
                     Size = UDim2.new(1, 0, 1, -35),
+                    Visible = not IsCollapsed, -- Set initial visibility
                     Parent = GroupboxHolder,
                 })
 
@@ -7242,37 +7244,33 @@ function Library:CreateWindow(WindowInfo)
                 Holder = GroupboxHolder,
                 Container = GroupboxContainer,
                 
-                Collapsed = false, -- Track state
+                Collapsed = IsCollapsed, -- Track state
 
                 Tab = Tab,
                 DependencyBoxes = {},
                 Elements = {},
             }
 
-            -- Toggles visibility, rotates arrow, and adjusts height
             function Groupbox:SetCollapsed(State)
                 Groupbox.Collapsed = State
                 GroupboxContainer.Visible = not State
                 HeaderLine.Visible = not State
                 
                 TweenService:Create(ArrowImage, Library.TweenInfo, {
-                    Rotation = State and 180 or 0 -- Flips the chevron icon upside down
+                    Rotation = State and 180 or 0
                 }):Play()
 
                 Groupbox:Resize()
             end
 
-            -- Click event for the header
             HeaderButton.MouseButton1Click:Connect(function()
                 Groupbox:SetCollapsed(not Groupbox.Collapsed)
             end)
 
             function Groupbox:Resize()
                 if Groupbox.Collapsed then
-                    -- If closed, constrain to header height (34px)
                     GroupboxHolder.Size = UDim2.new(1, 0, 0, 34)
                 else
-                    -- If open, scale based on the list layout of contents
                     GroupboxHolder.Size = UDim2.new(1, 0, 0, (GroupboxList.AbsoluteContentSize.Y / Library.DPIScale) + 49)
                 end
             end
@@ -7285,12 +7283,12 @@ function Library:CreateWindow(WindowInfo)
             return Groupbox
         end
 
-        function Tab:AddLeftGroupbox(Name, IconName)
-            return Tab:AddGroupbox({ Side = 1, Name = Name, IconName = IconName })
+        function Tab:AddLeftGroupbox(Name, IconName, Collapsed)
+            return Tab:AddGroupbox({ Side = 1, Name = Name, IconName = IconName, Collapsed = Collapsed })
         end
 
-        function Tab:AddRightGroupbox(Name, IconName)
-            return Tab:AddGroupbox({ Side = 2, Name = Name, IconName = IconName })
+        function Tab:AddRightGroupbox(Name, IconName, Collapsed)
+            return Tab:AddGroupbox({ Side = 2, Name = Name, IconName = IconName, Collapsed = Collapsed })
         end
 
         function Tab:AddTabbox(Info)
