@@ -118,7 +118,15 @@ do
         ["Material"] = {
             18,
             { FontColor = "eeffff", MainColor = "212121", AccentColor = "82aaff", BackgroundColor = "151515", OutlineColor = "424242" },
-        }
+        },
+        ["Blossom"] = {
+            19,
+            { FontColor = "fdf5f7", MainColor = "312529", AccentColor = "e3527f", BackgroundColor = "231b1e", OutlineColor = "140f11" },
+        },
+        ["Light Blossom"] = {
+            20,
+            { FontColor = "4a332a", MainColor = "f2e4e8", AccentColor = "e3527f", BackgroundColor = "fcf5f7", OutlineColor = "d1c0c5" },
+        },
     }
 
     function ThemeManager:SetLibrary(library)
@@ -224,7 +232,7 @@ do
     end
 
     function ThemeManager:LoadDefault()
-        local theme = "Default"
+        local theme = "Blossom"
         local content = isfile(self.Folder .. "/themes/default.txt") and readfile(self.Folder .. "/themes/default.txt")
 
         local isDefault = true
