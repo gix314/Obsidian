@@ -327,7 +327,7 @@ local Templates = {
         EnableCompacting = true,
         DisableCompactingSnap = false,
         SidebarCompacted = false,
-        MinContainerWidth = 256,
+        MinContainerWidth = Library.IsMobile and 150 or 256,
 
         --// Snapping \\--
         MinSidebarWidth = 128,
@@ -6820,7 +6820,10 @@ function Library:CreateWindow(WindowInfo)
     end
 
     function Window:SetSidebarWidth(Width)
-        Width = math.clamp(Width, 48, MainFrame.Size.X.Offset - WindowInfo.MinContainerWidth - 1)
+        local minWidth = 48
+        local maxWidth = math.max(minWidth, MainFrame.Size.X.Offset - WindowInfo.MinContainerWidth - 1)
+
+        Width = math.clamp(Width, minWidth, maxWidth)
 
         DividerLine.Position = UDim2.fromOffset(Width, 0)
 
@@ -7367,7 +7370,6 @@ function Library:CreateWindow(WindowInfo)
 
             setmetatable(Groupbox, BaseGroupbox)
 
-            -- Apply initial state (No argument/false = Collapsed. True = Opened).
             local IsOpened = Info.Opened == true 
             Groupbox.Collapsed = not IsOpened
             GroupboxContainer.Visible = IsOpened
