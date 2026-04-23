@@ -5146,6 +5146,113 @@ do
         return Dropdown
     end
 
+function Funcs:AddList(Idx, Info)
+    Info = Library:Validate(Info, {
+        Title = "",
+        Values = {},
+        Height = 150,
+        Default = nil,
+        Callback = function() end,
+        Visible = true,
+    })
+
+    local Groupbox = self
+    local Container = Groupbox.Container
+
+    local List = {
+        Values = Info.Values,
+        Value = nil,
+        Buttons = {},
+        Callback = Info.Callback,
+        Type = "List",
+    }
+
+    local Holder = New("Frame", {
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, (Info.Title ~= "" and 20 or 0) + Info.Height),
+        Visible = Info.Visible,
+        Parent = Container,
+    })
+
+    if Info.Title ~= "" then
+        New("TextLabel", {
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, 0, 0, 18),
+            Text = Info.Title,
+            TextSize = 14,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = Holder,
+        })
+    end
+
+    local Box = New("ScrollingFrame", {
+        BackgroundColor3 = "MainColor",
+        BorderSizePixel = 0,
+        Position = UDim2.fromOffset(0, Info.Title ~= "" and 20 or 0),
+        Size = UDim2.new(1, 0, 0, Info.Height),
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = "OutlineColor",
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        Parent = Holder,
+    })
+    
+    table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius/2), Parent = Box }))
+    New("UIStroke", { Color = "OutlineColor", Parent = Box })
+
+    local ListLayout = New("UIListLayout", { Parent = Box })
+
+    function List:BuildList()
+        for _, btn in pairs(List.Buttons) do btn:Destroy() end
+        table.clear(List.Buttons)
+
+        for _, val in ipairs(List.Values) do
+            local Button = New("TextButton", {
+                BackgroundColor3 = "AccentColor",
+                BackgroundTransparency = 1, 
+                Size = UDim2.new(1, 0, 0, 25),
+                Text = tostring(val),
+                TextSize = 14,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = Box,
+            })
+            New("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = Button })
+            table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius/2), Parent = Button }))
+
+            Button.MouseButton1Click:Connect(function()
+                List:SetValue(val)
+            end)
+
+            List.Buttons[val] = Button
+        end
+        if List.Value then List:SetValue(List.Value) end
+    end
+
+    function List:SetValue(val)
+        List.Value = val
+        for item, btn in pairs(List.Buttons) do
+            local isSelected = (item == val)
+            -- Matches the pinkish/red selection in your screenshots
+            btn.BackgroundTransparency = isSelected and 0.4 or 1
+            btn.TextColor3 = isSelected and Color3.new(1,1,1) or Library.Scheme.FontColor
+        end
+        Library:SafeCallback(List.Callback, val)
+    end
+
+    function List:SetValues(newValues)
+        List.Values = newValues
+        List:BuildList()
+    end
+
+    List:BuildList()
+    if Info.Default then List:SetValue(Info.Default) end
+    
+    Groupbox:Resize()
+    table.insert(Groupbox.Elements, List)
+    Options[Idx] = List
+    return List
+end
+
     function Funcs:AddViewport(Idx, Info)
         Info = Library:Validate(Info, Templates.Viewport)
 
