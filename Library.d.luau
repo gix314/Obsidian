@@ -663,6 +663,7 @@ export type Tab = {
     Hover: (self: Tab, Hovering: boolean) -> (),
     Show: (self: Tab) -> (),
     Hide: (self: Tab) -> (),
+    SetVisible: (self: Tab, Visible: boolean) -> (),
 }
 
 export type KeyTab = BaseGroupbox & {
@@ -675,6 +676,7 @@ export type KeyTab = BaseGroupbox & {
     Hover: (self: KeyTab, Hovering: boolean) -> (),
     Show: (self: KeyTab) -> (),
     Hide: (self: KeyTab) -> (),
+    SetVisible: (self: KeyTab, Visible: boolean) -> (),
 }
 
 export type DialogButtonInfo = {
