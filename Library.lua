@@ -7656,7 +7656,7 @@ function Library:CreateWindow(WindowInfo)
             return Tab:AddGroupbox({ Side = 2, Name = Name, IconName = IconName, Opened = Opened })
         end
 
-        function Funcs:AddTabbox(Name)
+function Funcs:AddTabbox(Name)
         local ParentObj = self
         local Container = ParentObj.Container
 
@@ -7667,10 +7667,10 @@ function Library:CreateWindow(WindowInfo)
             Info.Name = Name
         end
 
+        -- Removed AutomaticSize to prevent Roblox engine circular layout bugs
         local BoxHolder = New("Frame", {
-            AutomaticSize = Enum.AutomaticSize.Y,
             BackgroundTransparency = 1,
-            Size = UDim2.fromScale(1, 0),
+            Size = UDim2.new(1, 0, 0, 0), -- Starts at 0, sized dynamically in Tab:Resize
             Parent = Container,
         })
         New("UIListLayout", {
@@ -7689,7 +7689,7 @@ function Library:CreateWindow(WindowInfo)
         do
             TabboxHolder = New("Frame", {
                 BackgroundColor3 = "BackgroundColor",
-                Size = UDim2.fromScale(1, 0),
+                Size = UDim2.new(1, 0, 0, 0), -- Starts at 0, sized dynamically
                 Parent = BoxHolder,
             })
             table.insert(
@@ -7904,8 +7904,12 @@ function Library:CreateWindow(WindowInfo)
                     return
                 end
 
-                TabboxHolder.Size = UDim2.new(1, 0, 0, (List.AbsoluteContentSize.Y / Library.DPIScale) + 49)
-
+                local Height = (List.AbsoluteContentSize.Y / Library.DPIScale) + 49
+                TabboxHolder.Size = UDim2.new(1, 0, 0, Height)
+                
+                -- Resize parent BoxHolder manually here to prevent layout collapse
+                BoxHolder.Size = UDim2.new(1, 0, 0, Height + 8)
+                
                 if ParentObj and typeof(ParentObj.Resize) == "function" then
                     task.defer(function()
                         ParentObj:Resize()
