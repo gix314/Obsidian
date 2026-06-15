@@ -1,3 +1,26 @@
+## 21.04.2026
+
+```diff
+[features]
++ SaveManager:SetLoadingOrder(enabled: boolean, order: { })
+```
+
+## 05.04.2026
+
+```diff
+[features]
++ Library.Scheme.DestructiveColor
++ Library:CreateLoading(LoadingInfo)
+~ Read documentation at http://docs.mspaint.cc/obsidian/core/library/loading
+```
+
+## 03.04.2026
+
+```diff
+[features]
++ Tab:SetVisible()
+```
+
 ## 28.03.2026
 
 ```diff
