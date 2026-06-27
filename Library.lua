@@ -8790,15 +8790,15 @@ function Library:CreateWindow(WindowInfo)
             Position = UDim2.fromOffset(2, 0),
             Size = UDim2.fromOffset(3, 0),
             Visible = false,
-            ZIndex = 4,
-            Parent = Tabs,
+            ZIndex = 6,
+            Parent = MainFrame, -- Parented directly to MainFrame to bypass the scrolling frame layout
         })
         table.insert(Library.Corners, New("UICorner", {
             CornerRadius = UDim.new(0, 1.5),
             Parent = ActiveMarker
         }))
 
-        UpdateMarker = function()
+        UpdateMarker = function(instant)
             if not Library.ActiveTab then 
                 ActiveMarker.Visible = false
                 return 
@@ -8816,20 +8816,38 @@ function Library:CreateWindow(WindowInfo)
                 ActiveMarker.Visible = false
                 return 
             end
+
+            -- Safely defer coordinates rendering pass if layout is still completing initialization
+            if activeBtn.AbsolutePosition.Y == 0 then
+                task.defer(function()
+                    UpdateMarker(instant)
+                end)
+                return
+            end
             
             ActiveMarker.Visible = IsCompact
             if IsCompact then
-                local markerY = activeBtn.AbsolutePosition.Y - Tabs.AbsolutePosition.Y + Tabs.CanvasPosition.Y
+                local markerY = activeBtn.AbsolutePosition.Y - MainFrame.AbsolutePosition.Y
                 local markerHeight = 22
                 
-                TweenService:Create(ActiveMarker, Library.TweenInfo, {
-                    Position = UDim2.fromOffset(2, markerY + (40 - markerHeight) / 2),
-                    Size = UDim2.fromOffset(3, markerHeight),
-                }):Play()
+                if instant then
+                    ActiveMarker.Position = UDim2.fromOffset(2, markerY + (40 - markerHeight) / 2)
+                    ActiveMarker.Size = UDim2.fromOffset(3, markerHeight)
+                else
+                    TweenService:Create(ActiveMarker, Library.TweenInfo, {
+                        Position = UDim2.fromOffset(2, markerY + (40 - markerHeight) / 2),
+                        Size = UDim2.fromOffset(3, markerHeight),
+                    }):Play()
+                end
             else
                 ActiveMarker.Size = UDim2.fromOffset(3, 0)
             end
         end
+
+        -- Bind layout position tracker continuously to smooth pinning during scroll glides
+        Tabs:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+            UpdateMarker(true)
+        end)
     end
 
     --// Window Table \\--
