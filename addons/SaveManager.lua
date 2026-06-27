@@ -205,44 +205,50 @@ local SaveManager = {} do
     end
 
     --// Save, Load, Delete, Refresh \\--
-    function SaveManager:Save(name)
+    function SaveManager:Load(name)
         if (not name) then
             return false, "no config file is selected"
         end
         self.CurrentConfig = name
+        self.LoadingConfig = true
         SaveManager:CheckFolderTree()
 
-        local fullPath = self.Folder .. "/settings/" .. name .. ".json"
+        local file = self.Folder .. "/settings/" .. name .. ".json"
         if SaveManager:CheckSubFolder(true) then
-            fullPath = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
+            file = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
         end
 
-        local data = {
-            objects = {}
-        }
-
-        for idx, toggle in pairs(self.Library.Toggles) do
-            if not toggle.Type then continue end
-            if not self.Parser[toggle.Type] then continue end
-            if self.Ignore[idx] then continue end
-
-            table.insert(data.objects, self.Parser[toggle.Type].Save(idx, toggle))
+        if not isfile(file) then 
+            self.LoadingConfig = false
+            return false, "invalid file" 
         end
 
-        for idx, option in pairs(self.Library.Options) do
-            if not option.Type then continue end
-            if not self.Parser[option.Type] then continue end
-            if self.Ignore[idx] then continue end
-
-            table.insert(data.objects, self.Parser[option.Type].Save(idx, option))
+        local success, decoded = pcall(HttpService.JSONDecode, HttpService, readfile(file))
+        if not success then 
+            self.LoadingConfig = false
+            return false, "decode error" 
         end
 
-        local success, encoded = pcall(HttpService.JSONEncode, HttpService, data)
-        if not success then
-            return false, "failed to encode data"
+        if self.UseLoadingOrder == true and typeof(self.LoadingOrder) == "table" then
+            table.sort(decoded.objects, function(a, b)
+                local aIndex = table.find(self.LoadingOrder, a.type) or math.huge
+                local bIndex = table.find(self.LoadingOrder, b.type) or math.huge
+                return aIndex < bIndex
+            end)
         end
 
-        writefile(fullPath, encoded)
+        for _, option in decoded.objects do
+            if not option.type then continue end
+            if not self.Parser[option.type] then continue end
+            if self.Ignore[option.idx] then continue end
+
+            task.spawn(self.Parser[option.type].Load, option.idx, option)
+        end
+
+        task.delay(1, function()
+            self.LoadingConfig = false
+        end)
+
         return true
     end
 
@@ -400,6 +406,9 @@ local SaveManager = {} do
         local saveDebounce = nil
 
         local function triggerAutoSave()
+            if self.LoadingConfig then
+                return
+            end
             local activeConfig = self:GetAutoSaveConfig()
             if not activeConfig or activeConfig == "none" then
                 return
@@ -441,6 +450,8 @@ local SaveManager = {} do
     end
 
     function SaveManager:StartAutoSaveLoop(name)
+        self.CurrentConfig = name
+        self.LoadingConfig = false
         self:HookElementChanges()
     end
 
