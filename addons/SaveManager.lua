@@ -549,9 +549,12 @@ local SaveManager = {} do
     function SaveManager:BuildConfigSection(tab)
         assert(self.Library, "Must set SaveManager.Library")
 
+        self.AutoSaveConfigLabel = nil
+        self.AutoloadConfigLabel = nil
+
         local section = tab:AddRightGroupbox("Configuration", "folder-cog")
 
-        section:AddInput("SaveManager_ConfigName",    { Text = "Config name" })
+        section:AddInput("SaveManager_ConfigName", { Text = "Config name" })
         section:AddButton("Create config", function()
             local name = self.Library.Options.SaveManager_ConfigName.Value
 
@@ -617,15 +620,19 @@ local SaveManager = {} do
                         return
                     end
                     self:SaveAutoSaveConfig(name)
-                    self.AutoSaveConfigLabel:SetText("Current auto-save config: " .. name)
+                    if self.AutoSaveConfigLabel then
+                        self.AutoSaveConfigLabel:SetText("Current auto-save config: " .. name)
+                    end
                     self:StartAutoSaveLoop(name)
                 else
                     self:DeleteAutoSaveConfig()
-                    self.AutoSaveConfigLabel:SetText("Current auto-save config: none")
+                    if self.AutoSaveConfigLabel then
+                        self.AutoSaveConfigLabel:SetText("Current auto-save config: none")
+                    end
                     self:StopAutoSaveLoop()
                 end
             end
-        end)
+        })
 
         local ButtonG2 = section:AddButton("Refresh", function()
             self.Library.Options.SaveManager_ConfigList:SetValues(self:RefreshConfigList())
@@ -655,7 +662,9 @@ local SaveManager = {} do
             end
 
             self.Library:Notify(string.format("Set %q to auto load", name))
-            self.AutoloadConfigLabel:SetText("Current autoload config: " .. name)
+            if self.AutoloadConfigLabel then
+                self.AutoloadConfigLabel:SetText("Current autoload config: " .. name)
+            end
         end)
         ButtonG3:AddButton("Reset Autoload", function()
             local success, err = self:DeleteAutoLoadConfig()
@@ -665,7 +674,9 @@ local SaveManager = {} do
             end
 
             self.Library:Notify("Set autoload to none")
-            self.AutoloadConfigLabel:SetText("Current autoload config: none")
+            if self.AutoloadConfigLabel then
+                self.AutoloadConfigLabel:SetText("Current autoload config: none")
+            end
         end)
 
         self.AutoSaveConfigLabel = section:AddLabel("Current auto-save config: " .. self:GetAutoSaveConfig(), true)
