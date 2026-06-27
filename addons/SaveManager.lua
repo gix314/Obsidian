@@ -438,13 +438,14 @@ local SaveManager = {} do
             end)
         end
 
-        local function hookElement(element)
+        local function hookElement(idx, element)
             if not element or type(element) ~= "table" or not element.SetValue then return end
             if element.HookedForAutoSave then return end
             element.HookedForAutoSave = true
 
             local originalSetValue = element.SetValue
             element.SetValue = function(self, ...)
+                print("[SetValue Hook] Value update triggered on:", tostring(idx), "to:", tostring(...))
                 originalSetValue(self, ...)
                 if SaveManager:GetAutoSaveConfig() ~= "none" then
                     triggerAutoSave()
@@ -452,11 +453,11 @@ local SaveManager = {} do
             end
         end
 
-        for _, toggle in pairs(self.Library.Toggles) do
-            hookElement(toggle)
+        for idx, toggle in pairs(self.Library.Toggles) do
+            hookElement(idx, toggle)
         end
-        for _, option in pairs(self.Library.Options) do
-            hookElement(option)
+        for idx, option in pairs(self.Library.Options) do
+            hookElement(idx, option)
         end
     end
 
@@ -607,8 +608,11 @@ local SaveManager = {} do
                     end
                     if not name or name == "" or name == "none" then
                         self.Library:Notify("Please select a config to auto-save.")
-                        task.spawn(function()
-                            self.Library.Options.SaveManager_AutoSave:SetValue(false)
+                        task.defer(function()
+                            local opt = self.Library.Options.SaveManager_AutoSave
+                            if opt then
+                                opt:SetValue(false)
+                            end
                         end)
                         return
                     end
@@ -621,7 +625,7 @@ local SaveManager = {} do
                     self:StopAutoSaveLoop()
                 end
             end
-        })
+        end)
 
         local ButtonG2 = section:AddButton("Refresh", function()
             self.Library.Options.SaveManager_ConfigList:SetValues(self:RefreshConfigList())
