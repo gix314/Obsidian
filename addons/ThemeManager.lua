@@ -47,57 +47,57 @@ do
     ThemeManager.Library = nil
     ThemeManager.AppliedToTab = false
     ThemeManager.BuiltInThemes = {
-        ["Default"] = {
+        ["Demara"] = {
             1,
-            { FontColor = "ffffff", MainColor = "191919", AccentColor = "7d55ff", BackgroundColor = "0f0f0f", OutlineColor = "282828" },
+            { FontColor = "dce1df", MainColor = "202225", AccentColor = "98c43c", BackgroundColor = "151618", OutlineColor = "35393f" },
         },
-        ["BBot"] = {
+        ["Starlight"] = {
             2,
-            { FontColor = "ffffff", MainColor = "1e1e1e", AccentColor = "7e48a3", BackgroundColor = "232323", OutlineColor = "141414" },
+            { FontColor = "ececee", MainColor = "252528", AccentColor = "cf2a30", BackgroundColor = "19191a", OutlineColor = "44444a" },
         },
-        ["Fatality"] = {
+        ["Cunning Hares"] = {
             3,
-            { FontColor = "ffffff", MainColor = "1e1842", AccentColor = "c50754", BackgroundColor = "191335", OutlineColor = "3c355d" },
+            { FontColor = "f2f2f5", MainColor = "212022", AccentColor = "e397a6", BackgroundColor = "131214", OutlineColor = "423e42" },
         },
-        ["Jester"] = {
+        ["Soldier"] = {
             4,
-            { FontColor = "ffffff", MainColor = "242424", AccentColor = "db4467", BackgroundColor = "1c1c1c", OutlineColor = "373737" },
+            { FontColor = "e2e7e9", MainColor = "2a292c", AccentColor = "e89c1a", BackgroundColor = "1c1b1d", OutlineColor = "4b494d" },
         },
-        ["Mint"] = {
+        ["Wickes"] = {
             5,
-            { FontColor = "ffffff", MainColor = "242424", AccentColor = "3db488", BackgroundColor = "1c1c1c", OutlineColor = "373737" },
+            { FontColor = "eceef2", MainColor = "24262b", AccentColor = "9eb2a0", BackgroundColor = "171719", OutlineColor = "3a3d42" },
         },
-        ["Tokyo Night"] = {
+        ["Sebastiane"] = {
             6,
-            { FontColor = "ffffff", MainColor = "191925", AccentColor = "6759b3", BackgroundColor = "16161f", OutlineColor = "323232" },
+            { FontColor = "ededf0", MainColor = "222123", AccentColor = "c0272b", BackgroundColor = "141314", OutlineColor = "424043" },
         },
-        ["Ubuntu"] = {
+        ["Lycaon"] = {
             7,
-            { FontColor = "ffffff", MainColor = "3e3e3e", AccentColor = "e2581e", BackgroundColor = "323232", OutlineColor = "191919" },
+            { FontColor = "f5f7fa", MainColor = "1d1d22", AccentColor = "a31c21", BackgroundColor = "131215", OutlineColor = "403e45" },
         },
-        ["Quartz"] = {
+        ["Ben"] = {
             8,
-            { FontColor = "ffffff", MainColor = "232330", AccentColor = "426e87", BackgroundColor = "1d1b26", OutlineColor = "27232f" },
+            { FontColor = "e6e4eb", MainColor = "2b2a2d", AccentColor = "db4316", BackgroundColor = "1c1b1c", OutlineColor = "48464a" },
         },
-        ["Nord"] = {
+        ["Belobog"] = {
             9,
-            { FontColor = "eceff4", MainColor = "3b4252", AccentColor = "88c0d0", BackgroundColor = "2e3440", OutlineColor = "4c566a" },
+            { FontColor = "e7e5ec", MainColor = "252528", AccentColor = "e54714", BackgroundColor = "161618", OutlineColor = "cca33d" },
         },
-        ["Dracula"] = {
+        ["Piper"] = {
             10,
-            { FontColor = "f8f8f2", MainColor = "44475a", AccentColor = "ff79c6", BackgroundColor = "282a36", OutlineColor = "6272a4" },
+            { FontColor = "e5dfc5", MainColor = "262525", AccentColor = "c6502a", BackgroundColor = "171616", OutlineColor = "4a494a" },
         },
-        ["Monokai"] = {
+        ["Soukaku"] = {
             11,
-            { FontColor = "f8f8f2", MainColor = "272822", AccentColor = "f92672", BackgroundColor = "1e1f1c", OutlineColor = "49483e" },
+            { FontColor = "eef6fa", MainColor = "232b35", AccentColor = "59bde5", BackgroundColor = "14161a", OutlineColor = "365e69" },
         },
-        ["Gruvbox"] = {
+        ["Officer"] = {
             12,
-            { FontColor = "ebdbb2", MainColor = "3c3836", AccentColor = "fb4934", BackgroundColor = "282828", OutlineColor = "504945" },
+            { FontColor = "e8ebf0", MainColor = "1d2636", AccentColor = "3168cc", BackgroundColor = "131315", OutlineColor = "414754" },
         },
-        ["Solarized"] = {
+        ["Neo-Genesis"] = {
             13,
-            { FontColor = "839496", MainColor = "073642", AccentColor = "cb4b16", BackgroundColor = "002b36", OutlineColor = "586e75" },
+            { FontColor = "e6ebe8", MainColor = "23262d", AccentColor = "18856a", BackgroundColor = "16171a", OutlineColor = "383d47" },
         },
         ["Catppuccin"] = {
             14,
@@ -119,13 +119,17 @@ do
             18,
             { FontColor = "eeffff", MainColor = "212121", AccentColor = "82aaff", BackgroundColor = "151515", OutlineColor = "424242" },
         },
-        ["Blossom"] = {
+        ["Chief Angel"] = {
             19,
-            { FontColor = "fdf5f7", MainColor = "312529", AccentColor = "e3527f", BackgroundColor = "231b1e", OutlineColor = "140f11" },
+            { FontColor = "ebebf5", MainColor = "181f30", AccentColor = "416bae", BackgroundColor = "0d111b", OutlineColor = "354158" },
         },
-        ["Light Blossom"] = {
+        ["Mebius"] = {
             20,
-            { FontColor = "4a332a", MainColor = "f2e4e8", AccentColor = "e3527f", BackgroundColor = "fcf5f7", OutlineColor = "d1c0c5" },
+            { FontColor = "e2efe0", MainColor = "2d322e", AccentColor = "d4fa43", BackgroundColor = "1e1f22", OutlineColor = "535e4b" },
+        },
+        ["Guard of Staves"] = {
+            21,
+            { FontColor = "ebe7f3", MainColor = "1d1826", AccentColor = "df849d", BackgroundColor = "120e17", OutlineColor = "3c344a" },
         },
     }
 
@@ -232,7 +236,7 @@ do
     end
 
     function ThemeManager:LoadDefault()
-        local theme = "Blossom"
+        local theme = "Demara"
         local content = isfile(self.Folder .. "/themes/default.txt") and readfile(self.Folder .. "/themes/default.txt")
 
         local isDefault = true
@@ -518,3 +522,4 @@ end
 
 getgenv().ObsidianThemeManager = ThemeManager
 return ThemeManager
+
