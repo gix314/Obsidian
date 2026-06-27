@@ -10,11 +10,7 @@ local isfolder, isfile, listfiles = isfolder, isfile, listfiles
 
 if typeof(clonefunction) == "function" then
     -- Fix is_____ functions for shitsploits, those functions should never error, only return a boolean.
-
-    local
-        isfolder_copy,
-        isfile_copy,
-        listfiles_copy = clonefunction(isfolder), clonefunction(isfile), clonefunction(listfiles)
+    local isfolder_copy, isfile_copy, listfiles_copy = clonefunction(isfolder), clonefunction(isfile), clonefunction(listfiles)
 
     local isfolder_success, isfolder_error = pcall(function()
         return isfolder_copy("test" .. tostring(math.random(1000000, 9999999)))
@@ -113,6 +109,30 @@ local SaveManager = {} do
         },
     }
 
+    --// Logging System \\--
+    function SaveManager:Log(...)
+        local args = {...}
+        local str = ""
+        for i, v in ipairs(args) do
+            str = str .. tostring(v) .. (i < #args and " " or "")
+        end
+        local timestamp = os.date("[%Y-%m-%d %H:%M:%S]")
+        local logMsg = timestamp .. " " .. str
+
+        print(logMsg)
+
+        if not isfolder(self.Folder) then
+            pcall(makefolder, self.Folder)
+        end
+
+        local logFilePath = self.Folder .. "/save_manager_log.txt"
+        local success, currentLogs = pcall(readfile, logFilePath)
+        if not success then
+            currentLogs = ""
+        end
+        pcall(writefile, logFilePath, currentLogs .. logMsg .. "\n")
+    end
+
     function SaveManager:SetLibrary(library)
         self.Library = library
     end
@@ -197,6 +217,7 @@ local SaveManager = {} do
     function SaveManager:SetFolder(folder)
         self.Folder = folder
         self:BuildFolderTree()
+        pcall(writefile, self.Folder .. "/save_manager_log.txt", os.date("[Log Started %Y-%m-%d %H:%M:%S]\n"))
     end
 
     function SaveManager:SetSubFolder(folder)
@@ -206,9 +227,9 @@ local SaveManager = {} do
 
     --// Save, Load, Delete, Refresh \\--
     function SaveManager:Save(name)
-        print("[SaveManager] Save initiated for config:", tostring(name))
+        self:Log("[SaveManager] Save initiated for config:", tostring(name))
         if not name then
-            print("[SaveManager] Save failed: config name is nil")
+            self:Log("[SaveManager] Save failed: config name is nil")
             return false, "no config file is selected"
         end
         self.CurrentConfig = name
@@ -217,7 +238,7 @@ local SaveManager = {} do
         if SaveManager:CheckSubFolder(true) then
             fullPath = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
         end
-        print("[SaveManager] Full destination path:", fullPath)
+        self:Log("[SaveManager] Full destination path:", fullPath)
         local data = {
             objects = {}
         }
@@ -238,14 +259,14 @@ local SaveManager = {} do
             return false, "failed to encode data"
         end
         local writeOk, writeErr = pcall(writefile, fullPath, encoded)
-        print("[SaveManager] writefile completed. Status:", writeOk, "Error/Msg:", tostring(writeErr))
+        self:Log("[SaveManager] writefile completed. Status:", writeOk, "Error/Msg:", tostring(writeErr))
         return writeOk, writeErr or "success"
     end
 
     function SaveManager:Load(name)
-        print("[SaveManager] Load initiated for config:", tostring(name))
+        self:Log("[SaveManager] Load initiated for config:", tostring(name))
         if not name then
-            print("[SaveManager] Load failed: config name is nil")
+            self:Log("[SaveManager] Load failed: config name is nil")
             return false, "no config file is selected"
         end
         self.CurrentConfig = name
@@ -255,35 +276,37 @@ local SaveManager = {} do
         if SaveManager:CheckSubFolder(true) then
             file = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
         end
-        print("[SaveManager] Full source path:", file)
+        self:Log("[SaveManager] Full source path:", file)
         if not isfile(file) then 
             self.LoadingConfig = false
-            print("[SaveManager] Load failed: File does not exist")
+            self:Log("[SaveManager] Load failed: File does not exist")
             return false, "invalid file" 
         end
         local success, decoded = pcall(HttpService.JSONDecode, HttpService, readfile(file))
         if not success then 
             self.LoadingConfig = false
-            print("[SaveManager] Load failed: JSON decoding failed")
+            self:Log("[SaveManager] Load failed: JSON decoding failed")
             return false, "decode error" 
         end
-        if self.UseLoadingOrder == true and typeof(self.LoadingOrder) == "table" then
+        if self.UseLoadingOrder == true and typeof(decoded.objects) == "table" and typeof(self.LoadingOrder) == "table" then
             table.sort(decoded.objects, function(a, b)
                 local aIndex = table.find(self.LoadingOrder, a.type) or math.huge
                 local bIndex = table.find(self.LoadingOrder, b.type) or math.huge
                 return aIndex < bIndex
             end)
         end
-        print("[SaveManager] Spawning loaders for", #decoded.objects, "elements")
-        for _, option in decoded.objects do
-            if not option.type then continue end
-            if not self.Parser[option.type] then continue end
-            if self.Ignore[option.idx] then continue end
-            task.spawn(self.Parser[option.type].Load, option.idx, option)
+        self:Log("[SaveManager] Spawning loaders for", decoded.objects and #decoded.objects or 0, "elements")
+        if decoded.objects then
+            for _, option in decoded.objects do
+                if not option.type then continue end
+                if not self.Parser[option.type] then continue end
+                if self.Ignore[option.idx] then continue end
+                task.spawn(self.Parser[option.type].Load, option.idx, option)
+            end
         end
         task.delay(1, function()
             self.LoadingConfig = false
-            print("[SaveManager] LoadingConfig set to false. AutoSave triggers are now active.")
+            self:Log("[SaveManager] LoadingConfig set to false. AutoSave triggers are now active.")
         end)
         return true
     end
@@ -329,8 +352,6 @@ local SaveManager = {} do
             for i = 1, #list do
                 local file = list[i]
                 if file:sub(-5) == ".json" then
-                    -- i hate this but it has to be done ...
-
                     local pos = file:find(".json", 1, true)
                     local start = pos
 
@@ -403,37 +424,37 @@ local SaveManager = {} do
     end
     
     function SaveManager:HookElementChanges()
-        print("[SaveManager] Hooking elements for AutoSave...")
+        self:Log("[SaveManager] Setting up auto-save listeners...")
         local saveDebounce = nil
 
         local function triggerAutoSave()
-            print("[AutoSave] Trigger event detected.")
+            self:Log("[AutoSave] Trigger event detected.")
             if self.LoadingConfig then
-                print("[AutoSave] Ignored: Currently loading a configuration.")
+                self:Log("[AutoSave] Ignored: Currently loading a configuration.")
                 return
             end
             local activeConfig = self:GetAutoSaveConfig()
-            print("[AutoSave] Active auto-save config filename:", tostring(activeConfig))
+            self:Log("[AutoSave] Active auto-save config filename:", tostring(activeConfig))
             if not activeConfig or activeConfig == "none" then
-                print("[AutoSave] Ignored: No active config or set to none.")
+                self:Log("[AutoSave] Ignored: No active config or set to none.")
                 return
             end
 
             if saveDebounce then
-                print("[AutoSave] Resetting debounce timer.")
                 task.cancel(saveDebounce)
             end
 
-            saveDebounce = task.delay(0.5, function()
+            -- Fast 0.05 second delay to protect system disk I/O while maintaining instant responsiveness
+            saveDebounce = task.delay(0.05, function()
                 saveDebounce = nil
                 local name = self:GetAutoSaveConfig()
-                print("[AutoSave] Debounce complete. Target:", tostring(name), "CurrentConfig:", tostring(self.CurrentConfig))
+                self:Log("[AutoSave] Debounce complete. Target:", tostring(name), "CurrentConfig:", tostring(self.CurrentConfig))
                 if name ~= "none" and self.CurrentConfig == name then
-                    print("[AutoSave] Calling self:Save()...")
+                    self:Log("[AutoSave] Calling self:Save()...")
                     local ok, err = self:Save(name)
-                    print("[AutoSave] AutoSave output:", ok, tostring(err))
+                    self:Log("[AutoSave] AutoSave output:", ok, tostring(err))
                 else
-                    print("[AutoSave] Ignored: Target mismatch with CurrentConfig.")
+                    self:Log("[AutoSave] Ignored: Target mismatch with CurrentConfig.")
                 end
             end)
         end
@@ -443,26 +464,46 @@ local SaveManager = {} do
             if element.HookedForAutoSave then return end
             element.HookedForAutoSave = true
 
+            self:Log("[SaveManager] Hooked element:", tostring(idx))
+
             local originalSetValue = element.SetValue
-            element.SetValue = function(self, ...)
-                print("[SetValue Hook] Value update triggered on:", tostring(idx), "to:", tostring(...))
-                originalSetValue(self, ...)
+            element.SetValue = function(selfObj, ...)
+                self:Log("[SetValue Hook] Value update triggered on:", tostring(idx))
+                originalSetValue(selfObj, ...)
                 if SaveManager:GetAutoSaveConfig() ~= "none" then
                     triggerAutoSave()
                 end
             end
         end
 
+        -- Hook all existing toggles and options
         for idx, toggle in pairs(self.Library.Toggles) do
             hookElement(idx, toggle)
         end
         for idx, option in pairs(self.Library.Options) do
             hookElement(idx, option)
         end
+
+        -- Establish metatable observers so any elements registered dynamically/late are auto-hooked
+        local function setupObserver(tbl)
+            local mt = getmetatable(tbl) or {}
+            local originalNewIndex = mt.__newindex or rawset
+            
+            mt.__newindex = function(t, k, v)
+                originalNewIndex(t, k, v)
+                if typeof(v) == "table" then
+                    hookElement(k, v)
+                end
+            end
+            setmetatable(tbl, mt)
+        end
+
+        setupObserver(self.Library.Toggles)
+        setupObserver(self.Library.Options)
     end
 
     function SaveManager:StartAutoSaveLoop(name)
-        print("[SaveManager] Starting AutoSave loop for config:", tostring(name))
+        self:Log("[SaveManager] Starting AutoSave loop for config:", tostring(name))
         self.CurrentConfig = name
         self.LoadingConfig = false
         self:HookElementChanges()
