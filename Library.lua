@@ -4037,7 +4037,7 @@ do
                 ColorPicker.Vib = 1 - ((LocationY - MinY) / (MaxY - MinY))
 
                 if ColorPicker.Sat ~= OldSat or ColorPicker.Vib ~= OldVib then
-                    ColorPicker:Update()
+                    ColorPicker:SetValue({ColorPicker.Hue, ColorPicker.Sat, ColorPicker.Vib}, ColorPicker.Transparency)
                 end
 
                 RunService.RenderStepped:Wait()
@@ -4054,7 +4054,7 @@ do
                 ColorPicker.Hue = (Location - Min) / (Max - Min)
 
                 if ColorPicker.Hue ~= OldHue then
-                    ColorPicker:Update()
+                    ColorPicker:SetValue({ColorPicker.Hue, ColorPicker.Sat, ColorPicker.Vib}, ColorPicker.Transparency)
                 end
 
                 RunService.RenderStepped:Wait()
@@ -4072,7 +4072,7 @@ do
                     ColorPicker.Transparency = (Location - Min) / (Max - Min)
 
                     if ColorPicker.Transparency ~= OldTransparency then
-                        ColorPicker:Update()
+                        ColorPicker:SetValue({ColorPicker.Hue, ColorPicker.Sat, ColorPicker.Vib}, ColorPicker.Transparency)
                     end
 
                     RunService.RenderStepped:Wait()
@@ -5901,13 +5901,9 @@ do
                 local Location = Mouse.X
                 local Scale = math.clamp((Location - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
 
-                local OldValue = Slider.Value
-                Slider.Value = Round(Slider.Min + ((Slider.Max - Slider.Min) * Scale), Slider.Rounding)
-
-                Slider:Display()
-                if Slider.Value ~= OldValue then
-                    Library:SafeCallback(Slider.Callback, Slider.Value)
-                    Library:SafeCallback(Slider.Changed, Slider.Value)
+                local NewVal = Round(Slider.Min + ((Slider.Max - Slider.Min) * Scale), Slider.Rounding)
+                if NewVal ~= Slider.Value then
+                    Slider:SetValue(NewVal)
                 end
 
                 RunService.RenderStepped:Wait()
@@ -6353,22 +6349,14 @@ do
                         if not (Dropdown:GetActiveValues(true) == 1 and not Try and not Info.AllowNull) then
                             Selected = Try
                             if Info.Multi then
-                                Dropdown.Value[Value] = Selected and true or nil
+                                local NewTable = table.clone(Dropdown.Value)
+                                NewTable[Value] = Selected and true or nil
+                                Dropdown:SetValue(NewTable)
                             else
-                                Dropdown.Value = Selected and Value or nil
-                            end
-
-                            for _, OtherButton in Buttons do
-                                OtherButton:UpdateButton()
+                                local NewVal = Selected and Value or nil
+                                Dropdown:SetValue(NewVal)
                             end
                         end
-
-                        Table:UpdateButton()
-                        Dropdown:Display()
-
-                        Library:UpdateDependencyBoxes()
-                        Library:SafeCallback(Dropdown.Callback, Dropdown.Value)
-                        Library:SafeCallback(Dropdown.Changed, Dropdown.Value)
                     end)
                 end
 
