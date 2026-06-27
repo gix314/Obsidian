@@ -205,6 +205,47 @@ local SaveManager = {} do
     end
 
     --// Save, Load, Delete, Refresh \\--
+    function SaveManager:Save(name)
+        if (not name) then
+            return false, "no config file is selected"
+        end
+        self.CurrentConfig = name
+        SaveManager:CheckFolderTree()
+
+        local fullPath = self.Folder .. "/settings/" .. name .. ".json"
+        if SaveManager:CheckSubFolder(true) then
+            fullPath = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
+        end
+
+        local data = {
+            objects = {}
+        }
+
+        for idx, toggle in pairs(self.Library.Toggles) do
+            if not toggle.Type then continue end
+            if not self.Parser[toggle.Type] then continue end
+            if self.Ignore[idx] then continue end
+
+            table.insert(data.objects, self.Parser[toggle.Type].Save(idx, toggle))
+        end
+
+        for idx, option in pairs(self.Library.Options) do
+            if not option.Type then continue end
+            if not self.Parser[option.Type] then continue end
+            if self.Ignore[idx] then continue end
+
+            table.insert(data.objects, self.Parser[option.Type].Save(idx, option))
+        end
+
+        local success, encoded = pcall(HttpService.JSONEncode, HttpService, data)
+        if not success then
+            return false, "failed to encode data"
+        end
+
+        writefile(fullPath, encoded)
+        return true
+    end
+
     function SaveManager:Load(name)
         if (not name) then
             return false, "no config file is selected"
@@ -248,42 +289,6 @@ local SaveManager = {} do
         task.delay(1, function()
             self.LoadingConfig = false
         end)
-
-        return true
-    end
-
-    function SaveManager:Load(name)
-        if (not name) then
-            return false, "no config file is selected"
-        end
-        self.CurrentConfig = name
-        SaveManager:CheckFolderTree()
-
-        local file = self.Folder .. "/settings/" .. name .. ".json"
-        if SaveManager:CheckSubFolder(true) then
-            file = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
-        end
-
-        if not isfile(file) then return false, "invalid file" end
-
-        local success, decoded = pcall(HttpService.JSONDecode, HttpService, readfile(file))
-        if not success then return false, "decode error" end
-
-        if self.UseLoadingOrder == true and typeof(self.LoadingOrder) == "table" then
-            table.sort(decoded.objects, function(a, b)
-                local aIndex = table.find(self.LoadingOrder, a.type) or math.huge
-                local bIndex = table.find(self.LoadingOrder, b.type) or math.huge
-                return aIndex < bIndex
-            end)
-        end
-
-        for _, option in decoded.objects do
-            if not option.type then continue end
-            if not self.Parser[option.type] then continue end
-            if self.Ignore[option.idx] then continue end
-
-            task.spawn(self.Parser[option.type].Load, option.idx, option)
-        end
 
         return true
     end
