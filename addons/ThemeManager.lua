@@ -501,14 +501,14 @@ do
         end)
     end
 
-    function ThemeManager:CreateGroupBox(tab)
+    function ThemeManager:CreateGroupBox(tab, icon)
         assert(self.Library, "Must set ThemeManager.Library first!")
-        return tab:AddLeftGroupbox("Themes", "paintbrush")
+        return tab:AddLeftGroupbox("Themes", icon or "paintbrush")
     end
 
-    function ThemeManager:ApplyToTab(tab)
+    function ThemeManager:ApplyToTab(tab, icon)
         assert(self.Library, "Must set ThemeManager.Library first!")
-        local groupbox = self:CreateGroupBox(tab)
+        local groupbox = self:CreateGroupBox(tab, icon)
         self:CreateThemeManager(groupbox)
     end
 
