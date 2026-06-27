@@ -111,17 +111,30 @@ local SaveManager = {} do
         },
     }
 
-    --// Logging System (Commented out to prevent disk writes, uncomment print for debugging) \\--
+    --// Logging System (Safe, non-yielding on main thread) \\--
     function SaveManager:Log(...)
-        --[[
         local args = {...}
         local str = ""
         for i, v in ipairs(args) do
             str = str .. tostring(v) .. (i < #args and " " or "")
         end
         local timestamp = os.date("[%Y-%m-%d %H:%M:%S]")
-        print(timestamp .. " " .. str)
-        --]]
+        local logMsg = timestamp .. " " .. str
+
+        print(logMsg)
+
+        task.spawn(function()
+            if not isfolder(self.Folder) then
+                pcall(makefolder, self.Folder)
+            end
+
+            local logFilePath = self.Folder .. "/save_manager_log.txt"
+            local success, currentLogs = pcall(readfile, logFilePath)
+            if not success then
+                currentLogs = ""
+            end
+            pcall(writefile, logFilePath, currentLogs .. logMsg .. "\n")
+        end)
     end
 
     function SaveManager:SetLibrary(library)
@@ -209,6 +222,7 @@ local SaveManager = {} do
         self.Folder = folder
         self.AutoSaveConfigCached = nil -- Invalidate cache when directory changes
         self:BuildFolderTree()
+        pcall(writefile, self.Folder .. "/save_manager_log.txt", os.date("[Log Started %Y-%m-%d %H:%M:%S]\n"))
     end
 
     function SaveManager:SetSubFolder(folder)
@@ -435,7 +449,8 @@ local SaveManager = {} do
                 saveDebounce = nil
                 local name = self:GetAutoSaveConfig()
                 if name ~= "none" and self.CurrentConfig == name then
-                    self:Save(name)
+                    local ok, err = self:Save(name)
+                else
                 end
             end)
         end
