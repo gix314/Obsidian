@@ -423,10 +423,10 @@ local SaveManager = {} do
     end
 
     --// GUI \\--
-    function SaveManager:BuildConfigSection(tab)
+    function SaveManager:BuildConfigSection(tab, icon)
         assert(self.Library, "Must set SaveManager.Library")
 
-        local section = tab:AddRightGroupbox("Configuration", "folder-cog")
+        local section = tab:AddRightGroupbox("Configuration", icon or "folder-cog")
 
         section:AddInput("SaveManager_ConfigName",    { Text = "Config name" })
         section:AddButton("Create config", function()

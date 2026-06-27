@@ -1,3 +1,30 @@
+## 26.06.2026
+
+```diff
+[features]
++ :Destroy() function for every element
++ Volume option for Library:Notify()
++ KeyPicker for buttons (Only works with 'Press' mode, Callback to the button will have an passed value FromKeyPicker which will be true if it was activated by the key picker)
++ Icon and IconPosition parameters to Library:AddDraggableLabel() and Library:AddDraggableButton()
++ Slider.AllowRightClickInput (right click/double tap to open text input for specific value)
+
+[changes]
++ Implemented individual rounded corners for certain elements (dropdowns, right-click context menus)
++ Right-click context menus will now connect to the buttons visually
++ Dropdown:GetActiveValues() => Dropdown:GetActiveValues(ReturnCountForMulti: boolean) [true => returns value count]
++ The dropdown menu will now close if the button is not visible on the screen.
++ Other KeyPickers will no longer trigger when you are selecting the keybind
++ Mouse button KeyPickers will no longer trigger when you have the UI opened
++ Draggable labels, buttons, menus and image buttons will now find an position where they won't overlap other dragging elements
+
+[fixes]
++ Fixed AllowNull not properly working with Multi dropdowns
++ Fixed dropdown context menu not matching button size on the X axis
+
+[optimizations]
++ Obsidian Library table will now get properly garbage collected after calling Library:Unload()
+```
+
 ## 21.04.2026
 
 ```diff
@@ -103,7 +130,7 @@
 ## 09.11.2025
 
 ```diff
-+ Added Library.ImageManager (https://docs.mspaint.cc/obsidian/core/library#custom-asset-icons)
++ Added Library.ImageManager (https://docs.mspaint.cc/obsidian/core/library/utility#custom-asset-icons)
 ```
 
 ## 02.11.2025
