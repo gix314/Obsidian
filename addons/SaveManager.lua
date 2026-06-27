@@ -405,6 +405,7 @@ local SaveManager = {} do
     function SaveManager:HookElementChanges()
         print("[SaveManager] Hooking elements for AutoSave...")
         local saveDebounce = nil
+
         local function triggerAutoSave()
             print("[AutoSave] Trigger event detected.")
             if self.LoadingConfig then
@@ -414,14 +415,15 @@ local SaveManager = {} do
             local activeConfig = self:GetAutoSaveConfig()
             print("[AutoSave] Active auto-save config filename:", tostring(activeConfig))
             if not activeConfig or activeConfig == "none" then
-                print("[AutoSave] Ignored: No active target configuration file detected.")
+                print("[AutoSave] Ignored: No active config or set to none.")
                 return
             end
-            local idx = Options.SaveManager_ConfigList and Options.SaveManager_AutoSave and Options.SaveManager_ThemeList
+
             if saveDebounce then
                 print("[AutoSave] Resetting debounce timer.")
                 task.cancel(saveDebounce)
             end
+
             saveDebounce = task.delay(0.5, function()
                 saveDebounce = nil
                 local name = self:GetAutoSaveConfig()
@@ -435,52 +437,27 @@ local SaveManager = {} do
                 end
             end)
         end
-        local function hookElement(idx, element)
-            local raw_OnChanged = element.OnChanged
-            element.OnChanged = function(self, func)
-                func(element.Value)
-            end
-            raw_OnChanged(element, function(val)
-                pcall(up_field_ui)
-                pcall(ap)
-                pcall(u_gamespeed)
-                pcall(p_s)
-                pcall(trigger_save_auto)
-            end)
-        end
-        local function hook_toggles()
-            for idx, toggle in pairs(self.Library.Toggles) do
-                if not self.Ignore[idx] then
-                    local o_oc = toggle.OnChanged
-                    toggle.OnChanged = function(self, func)
-                        func(toggle.Value)
-                    end
-                    o_oc(toggle, function(val)
-                        pcall(u_gamespeed)
-                        pcall(ap)
-                        if Toggles.SaveManager_AutoSave and Toggles.SaveManager_AutoSave.Value then
-                            pcall(SaveManager.Save, SaveManager, SaveManager.CurrentConfig)
-                        end
-                    end)
-                end
-            end
-            for idx, option in pairs(self.Library.Options) do
-                if not self.Ignore[idx] and option.Type ~= "Button" then
-                    local o_oc = option.OnChanged
-                    option.OnChanged = function(self, func)
-                        func(option.Value)
-                    end
-                    o_oc(option, function(val)
-                        pcall(u_gamespeed)
-                        pcall(ap)
-                        if Toggles.SaveManager_AutoSave and Toggles.SaveManager_AutoSave.Value then
-                            pcall(SaveManager.Save, SaveManager, SaveManager.CurrentConfig)
-                        end
-                    end)
+
+        local function hookElement(element)
+            if not element or type(element) ~= "table" or not element.SetValue then return end
+            if element.HookedForAutoSave then return end
+            element.HookedForAutoSave = true
+
+            local originalSetValue = element.SetValue
+            element.SetValue = function(self, ...)
+                originalSetValue(self, ...)
+                if SaveManager:GetAutoSaveConfig() ~= "none" then
+                    triggerAutoSave()
                 end
             end
         end
-        pcall(hook_toggles)
+
+        for _, toggle in pairs(self.Library.Toggles) do
+            hookElement(toggle)
+        end
+        for _, option in pairs(self.Library.Options) do
+            hookElement(option)
+        end
     end
 
     function SaveManager:StartAutoSaveLoop(name)
