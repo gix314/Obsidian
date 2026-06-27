@@ -111,30 +111,17 @@ local SaveManager = {} do
         },
     }
 
-    --// Logging System (Safe, non-yielding on main thread) \\--
+    --// Logging System (Commented out to prevent disk writes, uncomment print for debugging) \\--
     function SaveManager:Log(...)
+        --[[
         local args = {...}
         local str = ""
         for i, v in ipairs(args) do
             str = str .. tostring(v) .. (i < #args and " " or "")
         end
         local timestamp = os.date("[%Y-%m-%d %H:%M:%S]")
-        local logMsg = timestamp .. " " .. str
-
-        print(logMsg)
-
-        task.spawn(function()
-            if not isfolder(self.Folder) then
-                pcall(makefolder, self.Folder)
-            end
-
-            local logFilePath = self.Folder .. "/save_manager_log.txt"
-            local success, currentLogs = pcall(readfile, logFilePath)
-            if not success then
-                currentLogs = ""
-            end
-            pcall(writefile, logFilePath, currentLogs .. logMsg .. "\n")
-        end)
+        print(timestamp .. " " .. str)
+        --]]
     end
 
     function SaveManager:SetLibrary(library)
@@ -222,7 +209,6 @@ local SaveManager = {} do
         self.Folder = folder
         self.AutoSaveConfigCached = nil -- Invalidate cache when directory changes
         self:BuildFolderTree()
-        pcall(writefile, self.Folder .. "/save_manager_log.txt", os.date("[Log Started %Y-%m-%d %H:%M:%S]\n"))
     end
 
     function SaveManager:SetSubFolder(folder)
@@ -233,9 +219,7 @@ local SaveManager = {} do
 
     --// Save, Load, Delete, Refresh \\--
     function SaveManager:Save(name)
-        self:Log("[SaveManager] Save initiated for config:", tostring(name))
         if not name then
-            self:Log("[SaveManager] Save failed: config name is nil")
             return false, "no config file is selected"
         end
         self.CurrentConfig = name
@@ -244,7 +228,6 @@ local SaveManager = {} do
         if SaveManager:CheckSubFolder(true) then
             fullPath = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
         end
-        self:Log("[SaveManager] Full destination path:", fullPath)
         local data = {
             objects = {}
         }
@@ -265,14 +248,11 @@ local SaveManager = {} do
             return false, "failed to encode data"
         end
         local writeOk, writeErr = pcall(writefile, fullPath, encoded)
-        self:Log("[SaveManager] writefile completed. Status:", writeOk, "Error/Msg:", tostring(writeErr))
         return writeOk, writeErr or "success"
     end
 
     function SaveManager:Load(name)
-        self:Log("[SaveManager] Load initiated for config:", tostring(name))
         if not name then
-            self:Log("[SaveManager] Load failed: config name is nil")
             return false, "no config file is selected"
         end
         self.CurrentConfig = name
@@ -282,16 +262,13 @@ local SaveManager = {} do
         if SaveManager:CheckSubFolder(true) then
             file = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
         end
-        self:Log("[SaveManager] Full source path:", file)
         if not isfile(file) then 
             self.LoadingConfig = false
-            self:Log("[SaveManager] Load failed: File does not exist")
             return false, "invalid file" 
         end
         local success, decoded = pcall(HttpService.JSONDecode, HttpService, readfile(file))
         if not success then 
             self.LoadingConfig = false
-            self:Log("[SaveManager] Load failed: JSON decoding failed")
             return false, "decode error" 
         end
         if self.UseLoadingOrder == true and typeof(decoded.objects) == "table" and typeof(self.LoadingOrder) == "table" then
@@ -301,7 +278,6 @@ local SaveManager = {} do
                 return aIndex < bIndex
             end)
         end
-        self:Log("[SaveManager] Spawning loaders for", decoded.objects and #decoded.objects or 0, "elements")
         if decoded.objects then
             for _, option in decoded.objects do
                 if not option.type then continue end
@@ -312,7 +288,6 @@ local SaveManager = {} do
         end
         task.delay(1, function()
             self.LoadingConfig = false
-            self:Log("[SaveManager] LoadingConfig set to false. AutoSave triggers are now active.")
         end)
         return true
     end
@@ -440,19 +415,14 @@ local SaveManager = {} do
     end
     
     function SaveManager:HookElementChanges()
-        self:Log("[SaveManager] Setting up auto-save listeners...")
         local saveDebounce = nil
 
         local function triggerAutoSave()
-            self:Log("[AutoSave] Trigger event detected.")
             if self.LoadingConfig then
-                self:Log("[AutoSave] Ignored: Currently loading a configuration.")
                 return
             end
             local activeConfig = self:GetAutoSaveConfig()
-            self:Log("[AutoSave] Active auto-save config filename:", tostring(activeConfig))
             if not activeConfig or activeConfig == "none" then
-                self:Log("[AutoSave] Ignored: No active config or set to none.")
                 return
             end
 
@@ -464,13 +434,8 @@ local SaveManager = {} do
             saveDebounce = task.delay(0.05, function()
                 saveDebounce = nil
                 local name = self:GetAutoSaveConfig()
-                self:Log("[AutoSave] Debounce complete. Target:", tostring(name), "CurrentConfig:", tostring(self.CurrentConfig))
                 if name ~= "none" and self.CurrentConfig == name then
-                    self:Log("[AutoSave] Calling self:Save()...")
-                    local ok, err = self:Save(name)
-                    self:Log("[AutoSave] AutoSave output:", ok, tostring(err))
-                else
-                    self:Log("[AutoSave] Ignored: Target mismatch with CurrentConfig.")
+                    self:Save(name)
                 end
             end)
         end
@@ -480,11 +445,8 @@ local SaveManager = {} do
             if element.HookedForAutoSave then return end
             element.HookedForAutoSave = true
 
-            self:Log("[SaveManager] Hooked element:", tostring(idx))
-
             local originalSetValue = element.SetValue
             element.SetValue = function(selfObj, ...)
-                self:Log("[SetValue Hook] Value update triggered on:", tostring(idx))
                 originalSetValue(selfObj, ...)
                 if SaveManager:GetAutoSaveConfig() ~= "none" then
                     triggerAutoSave()
@@ -519,7 +481,6 @@ local SaveManager = {} do
     end
 
     function SaveManager:StartAutoSaveLoop(name)
-        self:Log("[SaveManager] Starting AutoSave loop for config:", tostring(name))
         self.CurrentConfig = name
         self.LoadingConfig = false
         self:HookElementChanges()
