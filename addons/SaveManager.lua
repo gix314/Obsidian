@@ -42,6 +42,8 @@ local SaveManager = {} do
     SaveManager.UseLoadingOrder = false
     SaveManager.LoadingOrder = {}
     SaveManager.CurrentConfig = nil
+    SaveManager.AutoSaveConfigCached = nil
+
     SaveManager.Parser = {
         Toggle = {
             Save = function(idx, object)
@@ -109,7 +111,7 @@ local SaveManager = {} do
         },
     }
 
-    --// Logging System \\--
+    --// Logging System (Safe, non-yielding on main thread) \\--
     function SaveManager:Log(...)
         local args = {...}
         local str = ""
@@ -121,16 +123,19 @@ local SaveManager = {} do
 
         print(logMsg)
 
-        if not isfolder(self.Folder) then
-            pcall(makefolder, self.Folder)
-        end
+        -- Offloads disk checking and operations to an asynchronous thread context
+        task.spawn(function()
+            if not isfolder(self.Folder) then
+                pcall(makefolder, self.Folder)
+            end
 
-        local logFilePath = self.Folder .. "/save_manager_log.txt"
-        local success, currentLogs = pcall(readfile, logFilePath)
-        if not success then
-            currentLogs = ""
-        end
-        pcall(writefile, logFilePath, currentLogs .. logMsg .. "\n")
+            local logFilePath = self.Folder .. "/save_manager_log.txt"
+            local success, currentLogs = pcall(readfile, logFilePath)
+            if not success then
+                currentLogs = ""
+            end
+            pcall(writefile, logFilePath, currentLogs .. logMsg .. "\n")
+        end)
     end
 
     function SaveManager:SetLibrary(library)
@@ -385,6 +390,10 @@ local SaveManager = {} do
 
     -- // Auto Save \\ --
     function SaveManager:GetAutoSaveConfig()
+        if self.AutoSaveConfigCached then
+            return self.AutoSaveConfigCached
+        end
+
         SaveManager:CheckFolderTree()
         local autoSavePath = self.Folder .. "/settings/autosave.txt"
         if SaveManager:CheckSubFolder(true) then
@@ -393,15 +402,20 @@ local SaveManager = {} do
         if isfile(autoSavePath) then
             local successRead, name = pcall(readfile, autoSavePath)
             if not successRead then
+                self.AutoSaveConfigCached = "none"
                 return "none"
             end
             name = tostring(name)
-            return if name == "" then "none" else name
+            local result = if name == "" then "none" else name
+            self.AutoSaveConfigCached = result
+            return result
         end
+        self.AutoSaveConfigCached = "none"
         return "none"
     end
     
     function SaveManager:SaveAutoSaveConfig(name)
+        self.AutoSaveConfigCached = name
         SaveManager:CheckFolderTree()
         local autoSavePath = self.Folder .. "/settings/autosave.txt"
         if SaveManager:CheckSubFolder(true) then
@@ -413,6 +427,7 @@ local SaveManager = {} do
     end
     
     function SaveManager:DeleteAutoSaveConfig()
+        self.AutoSaveConfigCached = "none"
         SaveManager:CheckFolderTree()
         local autoSavePath = self.Folder .. "/settings/autosave.txt"
         if SaveManager:CheckSubFolder(true) then
