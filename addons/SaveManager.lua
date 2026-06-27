@@ -45,6 +45,7 @@ local SaveManager = {} do
     SaveManager.Library = nil
     SaveManager.UseLoadingOrder = false
     SaveManager.LoadingOrder = {}
+    SaveManager.CurrentConfig = nil
     SaveManager.Parser = {
         Toggle = {
             Save = function(idx, object)
@@ -205,61 +206,67 @@ local SaveManager = {} do
 
     --// Save, Load, Delete, Refresh \\--
     function SaveManager:Save(name)
-        if (not name) then
+        print("[SaveManager] Save initiated for config:", tostring(name))
+        if not name then
+            print("[SaveManager] Save failed: config name is nil")
             return false, "no config file is selected"
         end
+        self.CurrentConfig = name
         SaveManager:CheckFolderTree()
-
         local fullPath = self.Folder .. "/settings/" .. name .. ".json"
         if SaveManager:CheckSubFolder(true) then
             fullPath = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
         end
-
+        print("[SaveManager] Full destination path:", fullPath)
         local data = {
             objects = {}
         }
-
         for idx, toggle in pairs(self.Library.Toggles) do
             if not toggle.Type then continue end
             if not self.Parser[toggle.Type] then continue end
             if self.Ignore[idx] then continue end
-
             table.insert(data.objects, self.Parser[toggle.Type].Save(idx, toggle))
         end
-
         for idx, option in pairs(self.Library.Options) do
             if not option.Type then continue end
             if not self.Parser[option.Type] then continue end
             if self.Ignore[idx] then continue end
-
             table.insert(data.objects, self.Parser[option.Type].Save(idx, option))
         end
-
         local success, encoded = pcall(HttpService.JSONEncode, HttpService, data)
         if not success then
             return false, "failed to encode data"
         end
-
-        writefile(fullPath, encoded)
-        return true
+        local writeOk, writeErr = pcall(writefile, fullPath, encoded)
+        print("[SaveManager] writefile completed. Status:", writeOk, "Error/Msg:", tostring(writeErr))
+        return writeOk, writeErr or "success"
     end
 
     function SaveManager:Load(name)
-        if (not name) then
+        print("[SaveManager] Load initiated for config:", tostring(name))
+        if not name then
+            print("[SaveManager] Load failed: config name is nil")
             return false, "no config file is selected"
         end
+        self.CurrentConfig = name
+        self.LoadingConfig = true
         SaveManager:CheckFolderTree()
-
         local file = self.Folder .. "/settings/" .. name .. ".json"
         if SaveManager:CheckSubFolder(true) then
             file = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
         end
-
-        if not isfile(file) then return false, "invalid file" end
-
+        print("[SaveManager] Full source path:", file)
+        if not isfile(file) then 
+            self.LoadingConfig = false
+            print("[SaveManager] Load failed: File does not exist")
+            return false, "invalid file" 
+        end
         local success, decoded = pcall(HttpService.JSONDecode, HttpService, readfile(file))
-        if not success then return false, "decode error" end
-
+        if not success then 
+            self.LoadingConfig = false
+            print("[SaveManager] Load failed: JSON decoding failed")
+            return false, "decode error" 
+        end
         if self.UseLoadingOrder == true and typeof(self.LoadingOrder) == "table" then
             table.sort(decoded.objects, function(a, b)
                 local aIndex = table.find(self.LoadingOrder, a.type) or math.huge
@@ -267,21 +274,29 @@ local SaveManager = {} do
                 return aIndex < bIndex
             end)
         end
-
+        print("[SaveManager] Spawning loaders for", #decoded.objects, "elements")
         for _, option in decoded.objects do
             if not option.type then continue end
             if not self.Parser[option.type] then continue end
             if self.Ignore[option.idx] then continue end
-
-            task.spawn(self.Parser[option.type].Load, option.idx, option) -- task.spawn() so the config loading wont get stuck.
+            task.spawn(self.Parser[option.type].Load, option.idx, option)
         end
-
+        task.delay(1, function()
+            self.LoadingConfig = false
+            print("[SaveManager] LoadingConfig set to false. AutoSave triggers are now active.")
+        end)
         return true
     end
 
     function SaveManager:Delete(name)
         if (not name) then
             return false, "no config file is selected"
+        end
+
+        if self:GetAutoSaveConfig() == name then
+            if self.Library.Options.SaveManager_AutoSave then
+                self.Library.Options.SaveManager_AutoSave:SetValue(false)
+            end
         end
 
         local file = self.Folder .. "/settings/" .. name .. ".json"
@@ -347,6 +362,113 @@ local SaveManager = {} do
         return data
     end
 
+    -- // Auto Save \\ --
+    function SaveManager:GetAutoSaveConfig()
+        SaveManager:CheckFolderTree()
+        local autoSavePath = self.Folder .. "/settings/autosave.txt"
+        if SaveManager:CheckSubFolder(true) then
+            autoSavePath = self.Folder .. "/settings/" .. self.SubFolder .. "/autosave.txt"
+        end
+        if isfile(autoSavePath) then
+            local successRead, name = pcall(readfile, autoSavePath)
+            if not successRead then
+                return "none"
+            end
+            name = tostring(name)
+            return if name == "" then "none" else name
+        end
+        return "none"
+    end
+    
+    function SaveManager:SaveAutoSaveConfig(name)
+        SaveManager:CheckFolderTree()
+        local autoSavePath = self.Folder .. "/settings/autosave.txt"
+        if SaveManager:CheckSubFolder(true) then
+            autoSavePath = self.Folder .. "/settings/" .. self.SubFolder .. "/autosave.txt"
+        end
+        local success = pcall(writefile, autoSavePath, name)
+        if not success then return false, "write file error" end
+        return true, ""
+    end
+    
+    function SaveManager:DeleteAutoSaveConfig()
+        SaveManager:CheckFolderTree()
+        local autoSavePath = self.Folder .. "/settings/autosave.txt"
+        if SaveManager:CheckSubFolder(true) then
+            autoSavePath = self.Folder .. "/settings/" .. self.SubFolder .. "/autosave.txt"
+        end
+        local success = pcall(delfile, autoSavePath)
+        if not success then return false, "delete file error" end
+        return true, ""
+    end
+    
+    function SaveManager:HookElementChanges()
+        print("[SaveManager] Hooking elements for AutoSave...")
+        local saveDebounce = nil
+
+        local function triggerAutoSave()
+            print("[AutoSave] Trigger event detected.")
+            if self.LoadingConfig then
+                print("[AutoSave] Ignored: Currently loading a configuration.")
+                return
+            end
+            local activeConfig = self:GetAutoSaveConfig()
+            print("[AutoSave] Active auto-save config filename:", tostring(activeConfig))
+            if not activeConfig or activeConfig == "none" then
+                print("[AutoSave] Ignored: No active config or set to none.")
+                return
+            end
+
+            if saveDebounce then
+                print("[AutoSave] Resetting debounce timer.")
+                task.cancel(saveDebounce)
+            end
+
+            saveDebounce = task.delay(0.5, function()
+                saveDebounce = nil
+                local name = self:GetAutoSaveConfig()
+                print("[AutoSave] Debounce complete. Target:", tostring(name), "CurrentConfig:", tostring(self.CurrentConfig))
+                if name ~= "none" and self.CurrentConfig == name then
+                    print("[AutoSave] Calling self:Save()...")
+                    local ok, err = self:Save(name)
+                    print("[AutoSave] AutoSave output:", ok, tostring(err))
+                else
+                    print("[AutoSave] Ignored: Target mismatch with CurrentConfig.")
+                end
+            end)
+        end
+
+        local function hookElement(element)
+            if not element or type(element) ~= "table" or not element.SetValue then return end
+            if element.HookedForAutoSave then return end
+            element.HookedForAutoSave = true
+
+            local originalSetValue = element.SetValue
+            element.SetValue = function(self, ...)
+                originalSetValue(self, ...)
+                if SaveManager:GetAutoSaveConfig() ~= "none" then
+                    triggerAutoSave()
+                end
+            end
+        end
+
+        for _, toggle in pairs(self.Library.Toggles) do
+            hookElement(toggle)
+        end
+        for _, option in pairs(self.Library.Options) do
+            hookElement(option)
+        end
+    end
+
+    function SaveManager:StartAutoSaveLoop(name)
+        print("[SaveManager] Starting AutoSave loop for config:", tostring(name))
+        self.CurrentConfig = name
+        self.LoadingConfig = false
+        self:HookElementChanges()
+    end
+
+    function SaveManager:StopAutoSaveLoop()
+    end
     --// Auto Load \\--
     function SaveManager:GetAutoloadConfig()
         SaveManager:CheckFolderTree()
@@ -423,10 +545,10 @@ local SaveManager = {} do
     end
 
     --// GUI \\--
-    function SaveManager:BuildConfigSection(tab, icon)
+    function SaveManager:BuildConfigSection(tab)
         assert(self.Library, "Must set SaveManager.Library")
 
-        local section = tab:AddRightGroupbox("Configuration", icon or "folder-cog")
+        local section = tab:AddRightGroupbox("Configuration", "folder-cog")
 
         section:AddInput("SaveManager_ConfigName",    { Text = "Config name" })
         section:AddButton("Create config", function()
@@ -473,6 +595,34 @@ local SaveManager = {} do
 
             self.Library:Notify(string.format("Loaded config %q", name))
         end)
+
+        section:AddToggle("SaveManager_AutoSave", {
+            Text = "Auto Save Config",
+            Default = self:GetAutoSaveConfig() ~= "none",
+            Callback = function(state)
+                if state then
+                    local name = self:GetAutoSaveConfig()
+                    if name == "none" then
+                        name = self.Library.Options.SaveManager_ConfigList.Value
+                    end
+                    if not name or name == "" or name == "none" then
+                        self.Library:Notify("Please select a config to auto-save.")
+                        task.spawn(function()
+                            self.Library.Options.SaveManager_AutoSave:SetValue(false)
+                        end)
+                        return
+                    end
+                    self:SaveAutoSaveConfig(name)
+                    self.AutoSaveConfigLabel:SetText("Current auto-save config: " .. name)
+                    self:StartAutoSaveLoop(name)
+                else
+                    self:DeleteAutoSaveConfig()
+                    self.AutoSaveConfigLabel:SetText("Current auto-save config: none")
+                    self:StopAutoSaveLoop()
+                end
+            end
+        })
+
         local ButtonG2 = section:AddButton("Refresh", function()
             self.Library.Options.SaveManager_ConfigList:SetValues(self:RefreshConfigList())
             self.Library.Options.SaveManager_ConfigList:SetValue(nil)
@@ -514,10 +664,15 @@ local SaveManager = {} do
             self.AutoloadConfigLabel:SetText("Current autoload config: none")
         end)
 
+        self.AutoSaveConfigLabel = section:AddLabel("Current auto-save config: " .. self:GetAutoSaveConfig(), true)
         self.AutoloadConfigLabel = section:AddLabel("Current autoload config: " .. self:GetAutoloadConfig(), true)
 
-        -- self:LoadAutoloadConfig()
-        self:SetIgnoreIndexes({ "SaveManager_ConfigList", "SaveManager_ConfigName" })
+        local initialAutoSave = self:GetAutoSaveConfig()
+        if initialAutoSave ~= "none" then
+            self:StartAutoSaveLoop(initialAutoSave)
+        end
+
+        self:SetIgnoreIndexes({ "SaveManager_ConfigList", "SaveManager_ConfigName", "SaveManager_AutoSave" })
     end
 
     SaveManager:BuildFolderTree()
