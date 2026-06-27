@@ -206,70 +206,67 @@ local SaveManager = {} do
 
     --// Save, Load, Delete, Refresh \\--
     function SaveManager:Save(name)
-        if (not name) then
+        print("[SaveManager] Save initiated for config:", tostring(name))
+        if not name then
+            print("[SaveManager] Save failed: config name is nil")
             return false, "no config file is selected"
         end
         self.CurrentConfig = name
         SaveManager:CheckFolderTree()
-
         local fullPath = self.Folder .. "/settings/" .. name .. ".json"
         if SaveManager:CheckSubFolder(true) then
             fullPath = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
         end
-
+        print("[SaveManager] Full destination path:", fullPath)
         local data = {
             objects = {}
         }
-
         for idx, toggle in pairs(self.Library.Toggles) do
             if not toggle.Type then continue end
             if not self.Parser[toggle.Type] then continue end
             if self.Ignore[idx] then continue end
-
             table.insert(data.objects, self.Parser[toggle.Type].Save(idx, toggle))
         end
-
         for idx, option in pairs(self.Library.Options) do
             if not option.Type then continue end
             if not self.Parser[option.Type] then continue end
             if self.Ignore[idx] then continue end
-
             table.insert(data.objects, self.Parser[option.Type].Save(idx, option))
         end
-
         local success, encoded = pcall(HttpService.JSONEncode, HttpService, data)
         if not success then
             return false, "failed to encode data"
         end
-
-        writefile(fullPath, encoded)
-        return true
+        local writeOk, writeErr = pcall(writefile, fullPath, encoded)
+        print("[SaveManager] writefile completed. Status:", writeOk, "Error/Msg:", tostring(writeErr))
+        return writeOk, writeErr or "success"
     end
 
     function SaveManager:Load(name)
-        if (not name) then
+        print("[SaveManager] Load initiated for config:", tostring(name))
+        if not name then
+            print("[SaveManager] Load failed: config name is nil")
             return false, "no config file is selected"
         end
         self.CurrentConfig = name
         self.LoadingConfig = true
         SaveManager:CheckFolderTree()
-
         local file = self.Folder .. "/settings/" .. name .. ".json"
         if SaveManager:CheckSubFolder(true) then
             file = self.Folder .. "/settings/" .. self.SubFolder .. "/" .. name .. ".json"
         end
-
+        print("[SaveManager] Full source path:", file)
         if not isfile(file) then 
             self.LoadingConfig = false
+            print("[SaveManager] Load failed: File does not exist")
             return false, "invalid file" 
         end
-
         local success, decoded = pcall(HttpService.JSONDecode, HttpService, readfile(file))
         if not success then 
             self.LoadingConfig = false
+            print("[SaveManager] Load failed: JSON decoding failed")
             return false, "decode error" 
         end
-
         if self.UseLoadingOrder == true and typeof(self.LoadingOrder) == "table" then
             table.sort(decoded.objects, function(a, b)
                 local aIndex = table.find(self.LoadingOrder, a.type) or math.huge
@@ -277,19 +274,17 @@ local SaveManager = {} do
                 return aIndex < bIndex
             end)
         end
-
+        print("[SaveManager] Spawning loaders for", #decoded.objects, "elements")
         for _, option in decoded.objects do
             if not option.type then continue end
             if not self.Parser[option.type] then continue end
             if self.Ignore[option.idx] then continue end
-
             task.spawn(self.Parser[option.type].Load, option.idx, option)
         end
-
         task.delay(1, function()
             self.LoadingConfig = false
+            print("[SaveManager] LoadingConfig set to false. AutoSave triggers are now active.")
         end)
-
         return true
     end
 
@@ -408,53 +403,88 @@ local SaveManager = {} do
     end
     
     function SaveManager:HookElementChanges()
+        print("[SaveManager] Hooking elements for AutoSave...")
         local saveDebounce = nil
-
         local function triggerAutoSave()
+            print("[AutoSave] Trigger event detected.")
             if self.LoadingConfig then
+                print("[AutoSave] Ignored: Currently loading a configuration.")
                 return
             end
             local activeConfig = self:GetAutoSaveConfig()
+            print("[AutoSave] Active auto-save config filename:", tostring(activeConfig))
             if not activeConfig or activeConfig == "none" then
+                print("[AutoSave] Ignored: No active target configuration file detected.")
                 return
             end
-
+            local idx = Options.SaveManager_ConfigList and Options.SaveManager_AutoSave and Options.SaveManager_ThemeList
             if saveDebounce then
+                print("[AutoSave] Resetting debounce timer.")
                 task.cancel(saveDebounce)
             end
-
             saveDebounce = task.delay(0.5, function()
                 saveDebounce = nil
                 local name = self:GetAutoSaveConfig()
+                print("[AutoSave] Debounce complete. Target:", tostring(name), "CurrentConfig:", tostring(self.CurrentConfig))
                 if name ~= "none" and self.CurrentConfig == name then
-                    self:Save(name)
+                    print("[AutoSave] Calling self:Save()...")
+                    local ok, err = self:Save(name)
+                    print("[AutoSave] AutoSave output:", ok, tostring(err))
+                else
+                    print("[AutoSave] Ignored: Target mismatch with CurrentConfig.")
                 end
             end)
         end
-
-        local function hookElement(element)
-            if not element or type(element) ~= "table" or not element.SetValue then return end
-            if element.HookedForAutoSave then return end
-            element.HookedForAutoSave = true
-
-            local originalSetValue = element.SetValue
-            element.SetValue = function(self, ...)
-                originalSetValue(self, ...)
-                if SaveManager:GetAutoSaveConfig() ~= "none" then
-                    triggerAutoSave()
+        local function hookElement(idx, element)
+            local raw_OnChanged = element.OnChanged
+            element.OnChanged = function(self, func)
+                func(element.Value)
+            end
+            raw_OnChanged(element, function(val)
+                pcall(up_field_ui)
+                pcall(ap)
+                pcall(u_gamespeed)
+                pcall(p_s)
+                pcall(trigger_save_auto)
+            end)
+        end
+        local function hook_toggles()
+            for idx, toggle in pairs(self.Library.Toggles) do
+                if not self.Ignore[idx] then
+                    local o_oc = toggle.OnChanged
+                    toggle.OnChanged = function(self, func)
+                        func(toggle.Value)
+                    end
+                    o_oc(toggle, function(val)
+                        pcall(u_gamespeed)
+                        pcall(ap)
+                        if Toggles.SaveManager_AutoSave and Toggles.SaveManager_AutoSave.Value then
+                            pcall(SaveManager.Save, SaveManager, SaveManager.CurrentConfig)
+                        end
+                    end)
+                end
+            end
+            for idx, option in pairs(self.Library.Options) do
+                if not self.Ignore[idx] and option.Type ~= "Button" then
+                    local o_oc = option.OnChanged
+                    option.OnChanged = function(self, func)
+                        func(option.Value)
+                    end
+                    o_oc(option, function(val)
+                        pcall(u_gamespeed)
+                        pcall(ap)
+                        if Toggles.SaveManager_AutoSave and Toggles.SaveManager_AutoSave.Value then
+                            pcall(SaveManager.Save, SaveManager, SaveManager.CurrentConfig)
+                        end
+                    end)
                 end
             end
         end
-
-        for _, toggle in pairs(self.Library.Toggles) do
-            hookElement(toggle)
-        end
-        for _, option in pairs(self.Library.Options) do
-            hookElement(option)
-        end
+        pcall(hook_toggles)
     end
 
     function SaveManager:StartAutoSaveLoop(name)
+        print("[SaveManager] Starting AutoSave loop for config:", tostring(name))
         self.CurrentConfig = name
         self.LoadingConfig = false
         self:HookElementChanges()
