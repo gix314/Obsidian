@@ -9954,13 +9954,6 @@ function Library:CreateWindow(WindowInfo)
                     end
                 end
 
-                for _, Entry in ipairs(Library.TabButtons) do
-                    if Entry.Button == TabButton then
-                        Entry.Tab = Tab
-                        break
-                    end
-                end
-
                 if not Tabbox.ActiveTab then
                     Tab:Show()
                 end
@@ -10449,13 +10442,6 @@ function Library:CreateWindow(WindowInfo)
         end
 
         --// Execution \\--
-        for _, Entry in ipairs(Library.TabButtons) do
-            if Entry.Button == TabButton then
-                Entry.Tab = Tab
-                break
-            end
-        end
-
         if not Library.ActiveTab then
             Tab:Show()
         end
@@ -10773,13 +10759,6 @@ function Library:CreateWindow(WindowInfo)
 
             if not Visible and Library.ActiveTab == Tab then
                 Tab:Hide()
-            end
-        end
-
-        for _, Entry in ipairs(Library.TabButtons) do
-            if Entry.Button == TabButton then
-                Entry.Tab = Tab
-                break
             end
         end
 
