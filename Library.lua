@@ -9689,11 +9689,15 @@ function Library:CreateWindow(WindowInfo)
         local function AddTabbox(self, Info)
             local ParentObj = self
 
+            if typeof(Info) == "string" or Info == nil then
+                Info = { Name = Info }
+            end
+
             local BoxHolder = New("Frame", {
                 AutomaticSize = Enum.AutomaticSize.Y,
                 BackgroundTransparency = 1,
                 Size = UDim2.fromScale(1, 0),
-                Parent = if ParentObj.Type == "Groupbox" then ParentObj.Container else (Info.Side == 1 and TabLeft or TabRight),
+                Parent = if ParentObj.Type == "Groupbox" then ParentObj.Container else ((Info and Info.Side == 1) and TabLeft or TabRight),
             })
             New("UIListLayout", {
                 Padding = UDim.new(0, 6),
@@ -9957,7 +9961,6 @@ function Library:CreateWindow(WindowInfo)
                     end
                 end
 
-                --// Execution \\--
                 if not Tabbox.ActiveTab then
                     Tab:Show()
                 end
@@ -12355,3 +12358,4 @@ end
 
 getgenv().Library = Library
 return Library
+
