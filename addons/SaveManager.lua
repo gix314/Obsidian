@@ -968,7 +968,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
         end
     })
 
-    ConfigurationBox:AddButton({
+    local GBT1 = ConfigurationBox:AddButton({
         Text = "Load config",
         DoubleClick = false,
 
@@ -989,7 +989,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
         end
     })
     
-    ConfigurationBox:AddButton({
+    GBT1:AddButton({
         Text = "Overwrite config",
         DoubleClick = false,
 
@@ -1023,7 +1023,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
         end
     })
 
-    ConfigurationBox:AddButton({
+    local GBT2 = ConfigurationBox:AddButton({
         Text = "Delete config",
         DoubleClick = false,
 
@@ -1100,9 +1100,9 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
         end
     })
 
-    ConfigurationBox:AddButton("Refresh list", RefreshList)
+    GBT2:AddButton("Refresh list", RefreshList)
 
-    ConfigurationBox:AddButton({
+    local GBT3 = ConfigurationBox:AddButton({
         Text = "Set as autoload",
         DoubleClick = false,
 
@@ -1124,7 +1124,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
         end
     })
 
-    ConfigurationBox:AddButton({
+    GBT3:AddButton({
         Text = "Reset autoload",
         DoubleClick = false,
 
@@ -1175,4 +1175,3 @@ end
 
 SaveManager:BuildFolderTree()
 return SaveManager
-
