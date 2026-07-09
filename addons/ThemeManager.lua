@@ -48,79 +48,91 @@ local ThemeManager = {
     DefaultThemeName = nil,
 
     BuiltInThemes = {
-        ["Default"] = {
-            1,
-            { FontColor = "ffffff", MainColor = "191919", AccentColor = "7d55ff", BackgroundColor = "0f0f0f", OutlineColor = "282828", BackgroundImage = "" },
-        },
-        ["BBot"] = {
-            2,
-            { FontColor = "ffffff", MainColor = "1e1e1e", AccentColor = "7e48a3", BackgroundColor = "232323", OutlineColor = "141414", BackgroundImage = "" },
-        },
-        ["Fatality"] = {
-            3,
-            { FontColor = "ffffff", MainColor = "1e1842", AccentColor = "c50754", BackgroundColor = "191335", OutlineColor = "3c355d", BackgroundImage = "" },
-        },
-        ["Jester"] = {
-            4,
-            { FontColor = "ffffff", MainColor = "242424", AccentColor = "db4467", BackgroundColor = "1c1c1c", OutlineColor = "373737", BackgroundImage = "" },
-        },
-        ["Mint"] = {
-            5,
-            { FontColor = "ffffff", MainColor = "242424", AccentColor = "3db488", BackgroundColor = "1c1c1c", OutlineColor = "373737", BackgroundImage = "" },
-        },
-        ["Tokyo Night"] = {
-            6,
-            { FontColor = "ffffff", MainColor = "191925", AccentColor = "6759b3", BackgroundColor = "16161f", OutlineColor = "323232", BackgroundImage = "" },
-        },
-        ["Ubuntu"] = {
-            7,
-            { FontColor = "ffffff", MainColor = "3e3e3e", AccentColor = "e2581e", BackgroundColor = "323232", OutlineColor = "191919", BackgroundImage = "" },
-        },
-        ["Quartz"] = {
-            8,
-            { FontColor = "ffffff", MainColor = "232330", AccentColor = "426e87", BackgroundColor = "1d1b26", OutlineColor = "27232f", BackgroundImage = "" },
-        },
-        ["Nord"] = {
-            9,
-            { FontColor = "eceff4", MainColor = "3b4252", AccentColor = "88c0d0", BackgroundColor = "2e3440", OutlineColor = "4c566a", BackgroundImage = "" },
-        },
-        ["Dracula"] = {
-            10,
-            { FontColor = "f8f8f2", MainColor = "44475a", AccentColor = "ff79c6", BackgroundColor = "282a36", OutlineColor = "6272a4", BackgroundImage = "" },
-        },
-        ["Monokai"] = {
-            11,
-            { FontColor = "f8f8f2", MainColor = "272822", AccentColor = "f92672", BackgroundColor = "1e1f1c", OutlineColor = "49483e", BackgroundImage = "" },
-        },
-        ["Gruvbox"] = {
-            12,
-            { FontColor = "ebdbb2", MainColor = "3c3836", AccentColor = "fb4934", BackgroundColor = "282828", OutlineColor = "504945", BackgroundImage = "" },
-        },
-        ["Solarized"] = {
-            13,
-            { FontColor = "839496", MainColor = "073642", AccentColor = "cb4b16", BackgroundColor = "002b36", OutlineColor = "586e75", BackgroundImage = "" },
-        },
-        ["Catppuccin"] = {
-            14,
-            { FontColor = "d9e0ee", MainColor = "302d41", AccentColor = "f5c2e7", BackgroundColor = "1e1e2e", OutlineColor = "575268", BackgroundImage = "" },
-        },
-        ["One Dark"] = {
-            15,
-            { FontColor = "abb2bf", MainColor = "282c34", AccentColor = "c678dd", BackgroundColor = "21252b", OutlineColor = "5c6370", BackgroundImage = "" },
-        },
-        ["Cyberpunk"] = {
-            16,
-            { FontColor = "f9f9f9", MainColor = "262335", AccentColor = "00ff9f", BackgroundColor = "1a1a2e", OutlineColor = "413c5e", BackgroundImage = "" },
-        },
-        ["Oceanic Next"] = {
-            17,
-            { FontColor = "d8dee9", MainColor = "1b2b34", AccentColor = "6699cc", BackgroundColor = "16232a", OutlineColor = "343d46", BackgroundImage = "" },
-        },
-        ["Material"] = {
-            18,
-            { FontColor = "eeffff", MainColor = "212121", AccentColor = "82aaff", BackgroundColor = "151515", OutlineColor = "424242", BackgroundImage = "" },
-        }
+    ["Demara"] = {
+        1,
+        { FontColor = "dce1df", MainColor = "202225", AccentColor = "98c43c", BackgroundColor = "151618", OutlineColor = "35393f" },
+    },
+    ["Starlight"] = {
+        2,
+        { FontColor = "ececee", MainColor = "252528", AccentColor = "cf2a30", BackgroundColor = "19191a", OutlineColor = "44444a" },
+    },
+    ["Cunning Hares"] = {
+        3,
+        { FontColor = "f2f2f5", MainColor = "212022", AccentColor = "e397a6", BackgroundColor = "131214", OutlineColor = "423e42" },
+    },
+    ["Soldier"] = {
+        4,
+        { FontColor = "e2e7e9", MainColor = "2a292c", AccentColor = "e89c1a", BackgroundColor = "1c1b1d", OutlineColor = "4b494d" },
+    },
+    ["Wickes"] = {
+        5,
+        { FontColor = "eceef2", MainColor = "24262b", AccentColor = "9eb2a0", BackgroundColor = "171719", OutlineColor = "3a3d42" },
+    },
+    ["Sebastiane"] = {
+        6,
+        { FontColor = "ededf0", MainColor = "222123", AccentColor = "c0272b", BackgroundColor = "141314", OutlineColor = "424043" },
+    },
+    ["Lycaon"] = {
+        7,
+        { FontColor = "f5f7fa", MainColor = "1d1d22", AccentColor = "a31c21", BackgroundColor = "131215", OutlineColor = "403e45" },
+    },
+    ["Ben"] = {
+        8,
+        { FontColor = "e6e4eb", MainColor = "2b2a2d", AccentColor = "db4316", BackgroundColor = "1c1b1c", OutlineColor = "48464a" },
+    },
+    ["Belobog"] = {
+        9,
+        { FontColor = "e7e5ec", MainColor = "252528", AccentColor = "e54714", BackgroundColor = "161618", OutlineColor = "cca33d" },
+    },
+    ["Piper"] = {
+        10,
+        { FontColor = "e5dfc5", MainColor = "262525", AccentColor = "c6502a", BackgroundColor = "171616", OutlineColor = "4a494a" },
+    },
+    ["Soukaku"] = {
+        11,
+        { FontColor = "eef6fa", MainColor = "232b35", AccentColor = "59bde5", BackgroundColor = "14161a", OutlineColor = "365e69" },
+    },
+    ["Officer"] = {
+        12,
+        { FontColor = "e8ebf0", MainColor = "1d2636", AccentColor = "3168cc", BackgroundColor = "131315", OutlineColor = "414754" },
+    },
+    ["Neo-Genesis"] = {
+        13,
+        { FontColor = "e6ebe8", MainColor = "23262d", AccentColor = "18856a", BackgroundColor = "16171a", OutlineColor = "383d47" },
+    },
+    ["Catppuccin"] = {
+        14,
+        { FontColor = "d9e0ee", MainColor = "302d41", AccentColor = "f5c2e7", BackgroundColor = "1e1e2e", OutlineColor = "575268" },
+    },
+    ["One Dark"] = {
+        15,
+        { FontColor = "abb2bf", MainColor = "282c34", AccentColor = "c678dd", BackgroundColor = "21252b", OutlineColor = "5c6370" },
+    },
+    ["Cyberpunk"] = {
+        16,
+        { FontColor = "f9f9f9", MainColor = "262335", AccentColor = "00ff9f", BackgroundColor = "1a1a2e", OutlineColor = "413c5e" },
+    },
+    ["Oceanic Next"] = {
+        17,
+        { FontColor = "d8dee9", MainColor = "1b2b34", AccentColor = "6699cc", BackgroundColor = "16232a", OutlineColor = "343d46" },
+    },
+    ["Material"] = {
+        18,
+        { FontColor = "eeffff", MainColor = "212121", AccentColor = "82aaff", BackgroundColor = "151515", OutlineColor = "424242" },
+    },
+    ["Chief Angel"] = {
+        19,
+        { FontColor = "ebebf5", MainColor = "181f30", AccentColor = "416bae", BackgroundColor = "0d111b", OutlineColor = "354158" },
+    },
+    ["Mebius"] = {
+        20,
+        { FontColor = "e2efe0", MainColor = "2d322e", AccentColor = "d4fa43", BackgroundColor = "1e1f22", OutlineColor = "535e4b" },
+    },
+    ["Guard of Staves"] = {
+        21,
+        { FontColor = "ebe7f3", MainColor = "1d1826", AccentColor = "df849d", BackgroundColor = "120e17", OutlineColor = "3c344a" },
     }
+}
 }
 
 function ThemeManager:SetLibrary(Library)
@@ -369,7 +381,7 @@ function ThemeManager:SetDefaultTheme(Theme: any)
     assert(not ThemeManager.AppliedToTab, "Cannot set default theme after applying ThemeManager to a tab!")
 
     local Library = ThemeManager.Library
-    local DefaultThemeData = ThemeManager.BuiltInThemes["Default"][2]
+    local DefaultThemeData = ThemeManager.BuiltInThemes["Demara"][2]
 
     local LibraryScheme = {}
     local FinalTheme = {}
@@ -637,8 +649,8 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
     Themesbox:AddDropdown("FontFace", {
         Text = "Font Face",
         Default = "Code",
-        
-        Values = { "BuilderSans", "Code", "Fantasy", "Gotham", "Jura", "Roboto", "RobotoMono", "SourceSans" },
+        Searchable = true,
+        Values = { "AmaticSC", "Antique", "Arcade", "Arial", "ArialBold", "Bangers", "Bodoni", "BuilderSans", "BuilderSansMedium", "BuilderSansBold", "BuilderSansExtraBold", "Cartoon", "Code", "Creepster", "Denim", "Fantasy", "Fondamento", "FrancoisOne", "FredokaOne", "Garamond", "Gotham", "GothamMedium", "GothamBold", "GothamBlack", "GrenzeGotisch", "Highway", "IndieFlower", "JosefinSans", "Jura", "Kalam", "Legacy", "LuckiestGuy", "Merriweather", "Michroma", "Nunito", "Oswald", "PatrickHand", "PermanentMarker", "Roboto", "RobotoMono", "Sarpanch", "SciFi", "SourceSans", "SourceSansLight", "SourceSansSemibold", "SourceSansBold", "SourceSansItalic", "SpecialElite", "TitilliumWeb", "Ubuntu" },
         AllowNull = false,
         Multi = false
     })
@@ -662,14 +674,14 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         Multi = false,
 
         FormatDisplayValue = function(Value: any)
-            if Value ~= "Default" and Value == ThemeManager.DefaultThemeName then
+            if Value ~= "Demara" and Value == ThemeManager.DefaultThemeName then
                 return string.format("%s (default)", Value)
             end
 
             return Value
         end,
         FormatListValue = function(Value: any)
-            if Value ~= "Default" and Value == ThemeManager.DefaultThemeName then
+            if Value ~= "Demara" and Value == ThemeManager.DefaultThemeName then
                 return string.format("%s (default)", Value)
             end
 
@@ -751,7 +763,7 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         end
     })
 
-    Themesbox:AddButton("Load theme", function()
+    local GBT1 = Themesbox:AddButton("Load theme", function()
         local Name = CustomThemeList.Value
         if IsStringEmpty(Name) then
             ThemeManager.Library:Notify("Please select a theme first.")
@@ -762,7 +774,7 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         ThemeManager.Library:Notify(string.format("Successfully loaded theme %q", Name))
     end)
 
-    Themesbox:AddButton("Overwrite theme", function()
+    GBT1:AddButton("Overwrite theme", function()
         local Name = CustomThemeList.Value
         if IsStringEmpty(Name) then
             ThemeManager.Library:Notify("Please select a theme first.")
@@ -786,7 +798,7 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         )
     end)
 
-    Themesbox:AddButton("Delete theme", function()
+    local GBT2 = Themesbox:AddButton("Delete theme", function()
         local Name = CustomThemeList.Value
         if IsStringEmpty(Name) then
             ThemeManager.Library:Notify("Please select a theme first.")
@@ -816,9 +828,9 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         )
     end)
 
-    Themesbox:AddButton("Refresh list", RefreshList)
+    GBT2:AddButton("Refresh list", RefreshList)
 
-    Themesbox:AddButton("Set as default", function()
+    local GBT3 = Themesbox:AddButton("Set as default", function()
         local Name = CustomThemeList.Value
         if IsStringEmpty(Name) then
             ThemeManager.Library:Notify("Please select a theme first.")
@@ -830,7 +842,7 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         RefreshDefaultThemeLabel()
     end)
 
-    Themesbox:AddButton("Reset default", function()
+    GBT3:AddButton("Reset default", function()
         ShowDialog(
             function(): boolean
                 return true
@@ -854,17 +866,15 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         )
     end)
 
-    DefaultThemeLabel = Themesbox:AddLabel("Current default theme: ...", true);
+    DefaultThemeLabel = Themesbox:AddLabel("Current default theme: ...", true)
 
-    --// Set Variables
     CustomThemeList, CustomThemeName, ThemeList, FontFace, BackgroundImage =
         ThemeManager.Library.Options.ThemeManager_CustomThemeList,
         ThemeManager.Library.Options.ThemeManager_CustomThemeName,
         ThemeManager.Library.Options.ThemeManager_ThemeList,
         ThemeManager.Library.Options.FontFace,
-        ThemeManager.Library.Options.BackgroundImage;
+        ThemeManager.Library.Options.BackgroundImage
 
-    --// Handlers
     ThemeList:OnChanged(function()
         ThemeManager:ApplyTheme(ThemeList.Value)
     end)
@@ -881,7 +891,6 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
     FontFace:OnChanged(function(Value) ThemeManager.Library:SetFont(Enum.Font[Value]) end)
     BackgroundImage:OnChanged(function(Value) ThemeManager.Library:SetBackgroundImage(Value) end)
 
-    --// Load default
     ThemeManager:LoadDefault()
     ThemeManager.AppliedToTab = true
     RefreshDefaultThemeLabel()
