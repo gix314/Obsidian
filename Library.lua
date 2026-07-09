@@ -10466,7 +10466,9 @@ function Library:CreateWindow(WindowInfo)
         TabButton.MouseLeave:Connect(function()
             Tab:Hover(false)
         end)
-        TabButton.MouseButton1Click:Connect(Tab.Show)
+        TabButton.MouseButton1Click:Connect(function()
+            Tab:Show()
+        end)
 
         Library.Tabs[Name] = Tab
 
@@ -10792,7 +10794,9 @@ function Library:CreateWindow(WindowInfo)
         TabButton.MouseLeave:Connect(function()
             Tab:Hover(false)
         end)
-        TabButton.MouseButton1Click:Connect(Tab.Show)
+        TabButton.MouseButton1Click:Connect(function()
+            Tab:Show()
+        end)
 
         Tab.Container = TabContainer
         setmetatable(Tab, BaseGroupbox)
@@ -12365,4 +12369,3 @@ end
 
 getgenv().Library = Library
 return Library
-
