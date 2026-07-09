@@ -9316,7 +9316,7 @@ function Library:CreateWindow(WindowInfo)
             Description = select(3, ...)
         end
 
-        local TabButton: TextButton
+        local TabButton
         local TabLabel
         local TabIcon
 
@@ -9380,7 +9380,6 @@ function Library:CreateWindow(WindowInfo)
                 Tooltip = TabTooltip,
             })
 
-            --// Tab Canvas \\--
             TabCanvas = New("CanvasGroup", {
                 BackgroundTransparency = 1,
                 ClipsDescendants = true,
@@ -9390,7 +9389,6 @@ function Library:CreateWindow(WindowInfo)
                 Parent = Container,
             })
 
-            --// Tab Container \\--
             TabContainer = New("Frame", {
                 BackgroundTransparency = 1,
                 Position = UDim2.fromScale(0, 0),
@@ -9468,7 +9466,6 @@ function Library:CreateWindow(WindowInfo)
             end
         end
 
-        --// Warning Box \\--
         local WarningBoxHolder = New("Frame", {
             AutomaticSize = Enum.AutomaticSize.Y,
             BackgroundTransparency = 1,
@@ -9555,7 +9552,6 @@ function Library:CreateWindow(WindowInfo)
             })
         end
 
-        --// Tab Table \\--
         local Tab = {
             Description = Description,
 
@@ -10441,7 +10437,13 @@ function Library:CreateWindow(WindowInfo)
             Library.Tabs[Name] = nil
         end
 
-        --// Execution \\--
+        for _, Entry in ipairs(Library.TabButtons) do
+            if Entry.Button == TabButton then
+                Entry.Tab = Tab
+                break
+            end
+        end
+
         if not Library.ActiveTab then
             Tab:Show()
         end
@@ -10479,7 +10481,7 @@ function Library:CreateWindow(WindowInfo)
 
         Icon = Icon or "key"
 
-        local TabButton: TextButton
+        local TabButton
         local TabLabel
         local TabIcon
 
@@ -10540,7 +10542,6 @@ function Library:CreateWindow(WindowInfo)
                 Tooltip = TabTooltip,
             })
 
-            --// Tab Canvas \\--
             TabCanvas = New("CanvasGroup", {
                 BackgroundTransparency = 1,
                 ClipsDescendants = true,
@@ -10550,7 +10551,6 @@ function Library:CreateWindow(WindowInfo)
                 Parent = Container,
             })
 
-            --// Tab Container \\--
             TabContainer = New("ScrollingFrame", {
                 AutomaticCanvasSize = Enum.AutomaticSize.Y,
                 BackgroundTransparency = 1,
@@ -10574,7 +10574,6 @@ function Library:CreateWindow(WindowInfo)
             })
         end
 
-        --// Tab Table \\--
         local Tab = {
             Description = Description,
             IsKeyTab = true,
@@ -10601,7 +10600,7 @@ function Library:CreateWindow(WindowInfo)
                 TextSize = 14,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 Parent = Holder,
-            })
+                })
             New("UIPadding", {
                 PaddingLeft = UDim.new(0, 8),
                 PaddingRight = UDim.new(0, 8),
@@ -10762,7 +10761,13 @@ function Library:CreateWindow(WindowInfo)
             end
         end
 
-        --// Execution \\--
+        for _, Entry in ipairs(Library.TabButtons) do
+            if Entry.Button == TabButton then
+                Entry.Tab = Tab
+                break
+            end
+        end
+
         if not Library.ActiveTab then
             Tab:Show()
         end
