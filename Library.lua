@@ -1,3 +1,4 @@
+-- // Original version of UI Library: Obsidian
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
@@ -807,7 +808,6 @@ local function ApplySearchToTab(Tab, Search)
 
     local HasVisible = false
 
-    --// Loop through Groupboxes to get Elements Info
     for _, Groupbox in Tab.Groupboxes do
         if Groupbox.Visible == false then
             continue
@@ -819,10 +819,8 @@ local function ApplySearchToTab(Tab, Search)
                 ElementInfo.Holder.Visible = false
                 continue
             elseif ElementInfo.SubButton then
-                --// Check if any of the Buttons Name matches with Search
                 local Visible = false
 
-                --// Check if Search matches Element's Name and if Element is Visible
                 if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
                     Visible = true
                 else
@@ -842,7 +840,6 @@ local function ApplySearchToTab(Tab, Search)
                 continue
             end
 
-            --// Check if Search matches Element's Name and if Element is Visible
             if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
                 ElementInfo.Holder.Visible = true
                 VisibleElements += 1
@@ -859,7 +856,74 @@ local function ApplySearchToTab(Tab, Search)
             VisibleElements += CheckDepbox(Depbox, Search)
         end
 
-        --// Update Groupbox Size and Visibility if found any element
+        if Groupbox.Tabboxes then
+            for _, Tabbox in Groupbox.Tabboxes do
+                local VisibleTabs = 0
+                local VisibleElementsInTabbox = {}
+
+                for _, SubTab in Tabbox.Tabs do
+                    VisibleElementsInTabbox[SubTab] = 0
+
+                    for _, ElementInfo in SubTab.Elements do
+                        if ElementInfo.Type == "Divider" then
+                            ElementInfo.Holder.Visible = false
+                            continue
+                        elseif ElementInfo.SubButton then
+                            local Visible = false
+
+                            if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
+                                Visible = true
+                            else
+                                ElementInfo.Base.Visible = false
+                            end
+                            if ElementInfo.SubButton.Text:lower():match(Search) and ElementInfo.SubButton.Visible then
+                                Visible = true
+                            else
+                                ElementInfo.SubButton.Base.Visible = false
+                            end
+                            ElementInfo.Holder.Visible = Visible
+                            if Visible then
+                                VisibleElementsInTabbox[SubTab] += 1
+                            end
+
+                            continue
+                        end
+
+                        if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
+                            ElementInfo.Holder.Visible = true
+                            VisibleElementsInTabbox[SubTab] += 1
+                        else
+                            ElementInfo.Holder.Visible = false
+                        end
+                    end
+
+                    for _, Depbox in SubTab.DependencyBoxes do
+                        if not Depbox.Visible then
+                            continue
+                        end
+
+                        VisibleElementsInTabbox[SubTab] += CheckDepbox(Depbox, Search)
+                    end
+                end
+
+                for SubTab, Visible in VisibleElementsInTabbox do
+                    SubTab.ButtonHolder.Visible = Visible > 0
+                    if Visible > 0 then
+                        VisibleTabs += 1
+                        VisibleElements += 1
+
+                        if Tabbox.ActiveTab == SubTab then
+                            SubTab:Resize()
+                        elseif Tabbox.ActiveTab and (VisibleElementsInTabbox[Tabbox.ActiveTab] or 0) == 0 then
+                            SubTab:Show()
+                        end
+                    end
+                end
+
+                Tabbox.BoxHolder.Visible = VisibleTabs > 0
+            end
+        end
+
         if VisibleElements > 0 then
             Groupbox:Resize()
             HasVisible = true
@@ -879,10 +943,8 @@ local function ApplySearchToTab(Tab, Search)
                     ElementInfo.Holder.Visible = false
                     continue
                 elseif ElementInfo.SubButton then
-                    --// Check if any of the Buttons Name matches with Search
                     local Visible = false
 
-                    --// Check if Search matches Element's Name and if Element is Visible
                     if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
                         Visible = true
                     else
@@ -901,7 +963,6 @@ local function ApplySearchToTab(Tab, Search)
                     continue
                 end
 
-                --// Check if Search matches Element's Name and if Element is Visible
                 if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
                     ElementInfo.Holder.Visible = true
                     VisibleElements[SubTab] += 1
@@ -927,18 +988,18 @@ local function ApplySearchToTab(Tab, Search)
 
                 if Tabbox.ActiveTab == SubTab then
                     SubTab:Resize()
-                elseif Tabbox.ActiveTab and VisibleElements[Tabbox.ActiveTab] == 0 then
+                elseif Tabbox.ActiveTab and (VisibleElements[Tabbox.ActiveTab] or 0) == 0 then
                     SubTab:Show()
                 end
             end
         end
 
-        --// Update Tabbox Visibility if any visible
         Tabbox.BoxHolder.Visible = VisibleTabs > 0
     end
 
     return HasVisible
 end
+
 local function ResetTab(Tab)
     if not Tab then
         return
@@ -960,6 +1021,36 @@ local function ResetTab(Tab)
             end
 
             RestoreDepbox(Depbox)
+        end
+
+        if Groupbox.Tabboxes then
+            for _, Tabbox in Groupbox.Tabboxes do
+                for _, SubTab in Tabbox.Tabs do
+                    for _, ElementInfo in SubTab.Elements do
+                        ElementInfo.Holder.Visible = ElementInfo.Visible ~= false
+
+                        if ElementInfo.SubButton then
+                            ElementInfo.Base.Visible = ElementInfo.Visible
+                            ElementInfo.SubButton.Base.Visible = ElementInfo.SubButton.Visible
+                        end
+                    end
+
+                    for _, Depbox in SubTab.DependencyBoxes do
+                        if not Depbox.Visible then
+                            continue
+                        end
+
+                        RestoreDepbox(Depbox)
+                    end
+
+                    SubTab.ButtonHolder.Visible = true
+                end
+
+                if Tabbox.ActiveTab then
+                    Tabbox.ActiveTab:Resize()
+                end
+                Tabbox.BoxHolder.Visible = true
+            end
         end
 
         Groupbox:Resize()
@@ -2793,10 +2884,27 @@ function Library:AddTooltip(InfoStr: string, DisabledInfoStr: string, HoverInsta
             and Library:MouseIsOverFrame(HoverInstance, Mouse)
             and not (CurrentMenu and Library:MouseIsOverFrame(CurrentMenu.Menu, Mouse))
         do
-            TooltipLabel.Position = UDim2.fromOffset(
-                Mouse.X + (Library.ShowCustomCursor and 8 or 14),
-                Mouse.Y + (Library.ShowCustomCursor and 8 or 12)
-            )
+            local Camera = workspace.CurrentCamera
+            local ViewportSize = Camera and Camera.ViewportSize or Vector2.new(1920, 1080)
+            
+            local TooltipWidth = TooltipLabel.AbsoluteSize.X
+            local TooltipHeight = TooltipLabel.AbsoluteSize.Y
+            
+            local TargetX = Mouse.X + (Library.ShowCustomCursor and 8 or 14)
+            local TargetY = Mouse.Y + (Library.ShowCustomCursor and 8 or 12)
+            
+            if TargetX + TooltipWidth > ViewportSize.X then
+                TargetX = Mouse.X - TooltipWidth - (Library.ShowCustomCursor and 8 or 14)
+            end
+            
+            if TargetY + TooltipHeight > ViewportSize.Y then
+                TargetY = Mouse.Y - TooltipHeight - (Library.ShowCustomCursor and 8 or 12)
+            end
+            
+            TargetX = math.max(4, TargetX)
+            TargetY = math.max(4, TargetY)
+
+            TooltipLabel.Position = UDim2.fromOffset(TargetX, TargetY)
 
             RunService.RenderStepped:Wait()
         end
@@ -6934,6 +7042,112 @@ do
         return Dropdown
     end
 
+    function Funcs:AddList(Idx, Info)
+        Info = Library:Validate(Info, {
+            Title = "",
+            Values = {},
+            Height = 150,
+            Default = nil,
+            Callback = function() end,
+            Visible = true,
+        })
+
+        local Groupbox = self
+        local Container = Groupbox.Container
+
+        local List = {
+            Values = Info.Values,
+            Value = nil,
+            Buttons = {},
+            Callback = Info.Callback,
+            Type = "List",
+        }
+
+        local Holder = New("Frame", {
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, 0, 0, (Info.Title ~= "" and 20 or 0) + Info.Height),
+            Visible = Info.Visible,
+            Parent = Container,
+        })
+
+        if Info.Title ~= "" then
+            New("TextLabel", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, 18),
+                Text = Info.Title,
+                TextSize = 14,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = Holder,
+            })
+        end
+
+        local Box = New("ScrollingFrame", {
+            BackgroundColor3 = "MainColor",
+            BorderSizePixel = 0,
+            Position = UDim2.fromOffset(0, Info.Title ~= "" and 20 or 0),
+            Size = UDim2.new(1, 0, 0, Info.Height),
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            ScrollBarThickness = 3,
+            ScrollBarImageColor3 = "OutlineColor",
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            Parent = Holder,
+        })
+        
+        table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius/2), Parent = Box }))
+        New("UIStroke", { Color = "OutlineColor", Parent = Box })
+
+        local ListLayout = New("UIListLayout", { Parent = Box })
+
+        function List:BuildList()
+            for _, btn in pairs(List.Buttons) do btn:Destroy() end
+            table.clear(List.Buttons)
+
+            for _, val in ipairs(List.Values) do
+                local Button = New("TextButton", {
+                    BackgroundColor3 = "AccentColor",
+                    BackgroundTransparency = 1, 
+                    Size = UDim2.new(1, 0, 0, 25),
+                    Text = tostring(val),
+                    TextSize = 14,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = Box,
+                })
+                New("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = Button })
+                table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius/2), Parent = Button }))
+
+                Button.MouseButton1Click:Connect(function()
+                    List:SetValue(val)
+                end)
+
+                List.Buttons[val] = Button
+            end
+            if List.Value then List:SetValue(List.Value) end
+        end
+
+        function List:SetValue(val)
+            List.Value = val
+            for item, btn in pairs(List.Buttons) do
+                local isSelected = (item == val)
+                btn.BackgroundTransparency = isSelected and 0.4 or 1
+                btn.TextColor3 = isSelected and Color3.new(1,1,1) or Library.Scheme.FontColor
+            end
+            Library:SafeCallback(List.Callback, val)
+        end
+
+        function List:SetValues(newValues)
+            List.Values = newValues
+            List:BuildList()
+        end
+
+        List:BuildList()
+        if Info.Default then List:SetValue(Info.Default) end
+        
+        Groupbox:Resize()
+        table.insert(Groupbox.Elements, List)
+        Options[Idx] = List
+        return List
+    end
+
     function Funcs:AddViewport(Idx, Info)
         if self.Destroyed then return nil end
 
@@ -8419,6 +8633,8 @@ function Library:CreateWindow(WindowInfo)
     local BottomBackground
     local FooterLabel
     local TopBar
+    local ActiveMarker
+    local UpdateMarker
 
     local InitialLeftWidth = math.ceil(WindowInfo.Size.X.Offset * 0.3)
     local IsCompact = WindowInfo.SidebarCompacted
@@ -8782,6 +8998,69 @@ function Library:CreateWindow(WindowInfo)
         })
 
         Library.WindowContainer = Container
+
+        ActiveMarker = New("Frame", {
+            BackgroundColor3 = "AccentColor",
+            Position = UDim2.fromOffset(2, 0),
+            Size = UDim2.fromOffset(3, 0),
+            Visible = false,
+            ZIndex = 6,
+            Parent = MainFrame,
+        })
+        table.insert(Library.Corners, New("UICorner", {
+            CornerRadius = UDim.new(0, 1.5),
+            Parent = ActiveMarker
+        }))
+
+        UpdateMarker = function(instant)
+            if not Library.ActiveTab then 
+                ActiveMarker.Visible = false
+                return 
+            end
+            
+            local activeBtn = nil
+            for _, Entry in ipairs(Library.TabButtons) do
+                if Entry.Tab == Library.ActiveTab then
+                    activeBtn = Entry.Button
+                    break
+                end
+            end
+            
+            if not activeBtn then 
+                ActiveMarker.Visible = false
+                return 
+            end
+
+            if activeBtn.AbsolutePosition.Y == 0 then
+                task.defer(function()
+                    UpdateMarker(instant)
+                end)
+                return
+            end
+            
+            ActiveMarker.Visible = IsCompact
+            if IsCompact then
+                local dpiScale = Library.DPIScale or 1
+                local markerY = (activeBtn.AbsolutePosition.Y - MainFrame.AbsolutePosition.Y) / dpiScale
+                local markerHeight = 22
+                
+                if instant then
+                    ActiveMarker.Position = UDim2.fromOffset(2, markerY + (40 - markerHeight) / 2)
+                    ActiveMarker.Size = UDim2.fromOffset(3, markerHeight)
+                else
+                    TweenService:Create(ActiveMarker, Library.TweenInfo, {
+                        Position = UDim2.fromOffset(2, markerY + (40 - markerHeight) / 2),
+                        Size = UDim2.fromOffset(3, markerHeight),
+                    }):Play()
+                end
+            else
+                ActiveMarker.Size = UDim2.fromOffset(3, 0)
+            end
+        end
+
+        Tabs:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+            UpdateMarker(true)
+        end)
     end
 
     --// Window Table \\--
@@ -8955,6 +9234,10 @@ function Library:CreateWindow(WindowInfo)
         end
 
         for _, Button in Library.TabButtons do
+            if Button.Tooltip then
+                Button.Tooltip.Disabled = not IsCompact
+            end
+
             if not Button.Icon then
                 continue
             end
@@ -8966,6 +9249,8 @@ function Library:CreateWindow(WindowInfo)
             Button.Padding.PaddingTop = UDim.new(0, IsCompact and 6 or 11)
             Button.Icon.SizeConstraint = IsCompact and Enum.SizeConstraint.RelativeXY or Enum.SizeConstraint.RelativeYY
         end
+
+        UpdateMarker()
     end
 
     function Window:IsSidebarCompacted()
@@ -9083,10 +9368,16 @@ function Library:CreateWindow(WindowInfo)
                 })
             end
 
+            local TabTooltip = Library:AddTooltip(Name, nil, TabButton)
+            TabTooltip.Disabled = not IsCompact
+
             table.insert(Library.TabButtons, {
                 Label = TabLabel,
                 Padding = ButtonPadding,
                 Icon = TabIcon,
+                Button = TabButton,
+                Tab = nil,
+                Tooltip = TabTooltip,
             })
 
             --// Tab Canvas \\--
@@ -9659,6 +9950,13 @@ function Library:CreateWindow(WindowInfo)
                     end
                 end
 
+                for _, Entry in ipairs(Library.TabButtons) do
+                    if Entry.Button == TabButton then
+                        Entry.Tab = Tab
+                        break
+                    end
+                end
+
                 --// Execution \\--
                 if not Tabbox.ActiveTab then
                     Tab:Show()
@@ -9702,6 +10000,15 @@ function Library:CreateWindow(WindowInfo)
                 Tab.Tabboxes[Info.Name] = Tabbox
             else
                 table.insert(Tab.Tabboxes, Tabbox)
+            end
+
+            if ParentObj.Type == "Groupbox" then
+                ParentObj.Tabboxes = ParentObj.Tabboxes or {}
+                if Info.Name then
+                    ParentObj.Tabboxes[Info.Name] = Tabbox
+                else
+                    table.insert(ParentObj.Tabboxes, Tabbox)
+                end
             end
 
             return Tabbox
@@ -10056,6 +10363,8 @@ function Library:CreateWindow(WindowInfo)
             if Library.Searching then
                 Library:UpdateSearch(Library.SearchText)
             end
+
+            UpdateMarker()
         end
 
         function Tab:Hide()
@@ -10221,10 +10530,16 @@ function Library:CreateWindow(WindowInfo)
                 })
             end
 
+            local TabTooltip = Library:AddTooltip(Name, nil, TabButton)
+            TabTooltip.Disabled = not IsCompact
+
             table.insert(Library.TabButtons, {
                 Label = TabLabel,
                 Padding = ButtonPadding,
                 Icon = TabIcon,
+                Button = TabButton,
+                Tab = nil,
+                Tooltip = TabTooltip,
             })
 
             --// Tab Canvas \\--
@@ -10416,6 +10731,8 @@ function Library:CreateWindow(WindowInfo)
             if Library.Searching then
                 Library:UpdateSearch(Library.SearchText)
             end
+
+            UpdateMarker()
         end
 
         function Tab:Hide()
@@ -10444,6 +10761,13 @@ function Library:CreateWindow(WindowInfo)
 
             if not Visible and Library.ActiveTab == Tab then
                 Tab:Hide()
+            end
+        end
+
+        for _, Entry in ipairs(Library.TabButtons) do
+            if Entry.Button == TabButton then
+                Entry.Tab = Tab
+                break
             end
         end
 
@@ -11168,6 +11492,8 @@ function Library:CreateWindow(WindowInfo)
     end
     if WindowInfo.EnableCompacting and WindowInfo.SidebarCompacted then
         Window:SetSidebarWidth(WindowInfo.SidebarCompactWidth)
+    else
+        ApplyCompact()
     end
     if WindowInfo.AutoShow and not Library.ActiveLoading then
         task.spawn(Library.Toggle)
