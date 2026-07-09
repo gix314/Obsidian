@@ -10449,6 +10449,13 @@ function Library:CreateWindow(WindowInfo)
         end
 
         --// Execution \\--
+        for _, Entry in ipairs(Library.TabButtons) do
+            if Entry.Button == TabButton then
+                Entry.Tab = Tab
+                break
+            end
+        end
+
         if not Library.ActiveTab then
             Tab:Show()
         end
@@ -10460,13 +10467,6 @@ function Library:CreateWindow(WindowInfo)
             Tab:Hover(false)
         end)
         TabButton.MouseButton1Click:Connect(Tab.Show)
-
-        for _, Entry in ipairs(Library.TabButtons) do
-            if Entry.Button == TabButton then
-                Entry.Tab = Tab
-                break
-            end
-        end
 
         Library.Tabs[Name] = Tab
 
