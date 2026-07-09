@@ -354,6 +354,7 @@ function SaveManager:SetFolder(Folder: string)
     assert(IsValidFolderPath(Folder), "Invalid path provided")
 
     SaveManager.Folder = Folder
+    SaveManager.AutoSaveConfigCached = nil
     SaveManager:BuildFolderTree()
 end
 
@@ -361,6 +362,7 @@ function SaveManager:SetSubFolder(SubFolder: string)
     assert(IsValidFolderPath(SubFolder), "Invalid path provided")
 
     SaveManager.SubFolder = SubFolder
+    SaveManager.AutoSaveConfigCached = nil
     SaveManager:BuildFolderTree()
 end
 
@@ -406,6 +408,7 @@ function SaveManager:Save(ConfigName: string): (boolean, string?)
         return false, "Invalid config name provided"
     end
 
+    SaveManager.CurrentConfig = ConfigName
     SaveManager:CheckFolderTree()
 
     local Library = SaveManager.Library
@@ -421,7 +424,6 @@ function SaveManager:Save(ConfigName: string): (boolean, string?)
         } else nil
     }
 
-    --// Toggles
     for Index, Toggle in Library.Toggles do
         if not Toggle.Type then continue end
         if IgnoreIndexes[Index] then continue end
@@ -432,7 +434,6 @@ function SaveManager:Save(ConfigName: string): (boolean, string?)
         table.insert(CurrentData.objects, Parser.Save(Index, Toggle))
     end
 
-    --// Options
     for Index, Option in Library.Options do
         if not Option.Type then continue end
         if IgnoreIndexes[Index] then continue end
@@ -443,7 +444,6 @@ function SaveManager:Save(ConfigName: string): (boolean, string?)
         table.insert(CurrentData.objects, Parser.Save(Index, Option))
     end
 
-    --// Groupboxes
     for TabIndex, Tab in Library.Tabs do
         if not Tab.Groupboxes then continue end
 
@@ -467,6 +467,7 @@ function SaveManager:Save(ConfigName: string): (boolean, string?)
         return false, "Failed to write config file: " .. tostring(ErrorMessage)
     end
 
+    SaveManager.ConfigLoaded = true
     return true
 end
 
@@ -480,13 +481,18 @@ function SaveManager:Load(ConfigName: string): (boolean, string?)
         return false, "Config file does not exist"
     end
 
+    SaveManager.CurrentConfig = ConfigName
+    SaveManager.LoadingConfig = true
+
     local SuccessRead, Content = pcall(readfile, ConfigPath)
     if not SuccessRead then
+        SaveManager.LoadingConfig = false
         return false, "Failed to read config file"
     end
 
     local SuccessDecode, Decoded = pcall(HttpService.JSONDecode, HttpService, Content)
     if not SuccessDecode or typeof(Decoded) ~= "table" or typeof(Decoded.objects) ~= "table" then
+        SaveManager.LoadingConfig = false
         return false, "Failed to decode config data"
     end
 
@@ -502,7 +508,6 @@ function SaveManager:Load(ConfigName: string): (boolean, string?)
         end)
     end
 
-    --// Keybind Menu
     if Library.KeybindFrame and typeof(Decoded.keybindMenu) == "table" then
         local KeybindFrameData = Decoded.keybindMenu
         local IsVisible = KeybindFrameData.visible == true
@@ -517,7 +522,6 @@ function SaveManager:Load(ConfigName: string): (boolean, string?)
         end
     end
 
-    --// Elements
     for _, Option in Decoded.objects do
         if not Option.type then continue end
         if IgnoreIndexes[Option.idx] then continue end
@@ -528,12 +532,24 @@ function SaveManager:Load(ConfigName: string): (boolean, string?)
         task.spawn(Parser.Load, Option.idx, Option)
     end
 
+    task.delay(1, function()
+        SaveManager.LoadingConfig = false
+    end)
+
+    SaveManager.ConfigLoaded = true
     return true
 end
 
 function SaveManager:Delete(ConfigName: string): (boolean | string?)
     if IsStringEmpty(ConfigName) then
         return false, "No config is selected"
+    end
+
+    if SaveManager:GetAutoSaveConfig() == ConfigName then
+        local AutoSaveOpt = SaveManager.Library.Options.SaveManager_AutoSave
+        if AutoSaveOpt then
+            AutoSaveOpt:SetValue(false)
+        end
     end
 
     local ConfigPath = GetConfigPath(ConfigName)
@@ -551,6 +567,178 @@ function SaveManager:Delete(ConfigName: string): (boolean | string?)
     end
 
     return true
+end
+
+
+-- // Auto Save Config
+local function GetAutoSavePath(): false | string
+    local CurrentSettingsPath = GetCurrentSettingsPath()
+    return if CurrentSettingsPath == false then false else string.format("%s/autosave.txt", CurrentSettingsPath)
+end
+
+function SaveManager:GetAutoSaveConfig(): string
+    if SaveManager.AutoSaveConfigCached ~= nil then
+        return SaveManager.AutoSaveConfigCached
+    end
+
+    SaveManager:CheckFolderTree()
+    local AutoSavePath = GetAutoSavePath()
+    if AutoSavePath == false then
+        SaveManager.AutoSaveConfigCached = "none"
+        return "none"
+    end
+
+    if isfile(AutoSavePath) then
+        local SuccessRead, Name = pcall(readfile, AutoSavePath)
+        if not SuccessRead then
+            SaveManager.AutoSaveConfigCached = "none"
+            return "none"
+        end
+        Name = tostring(Name)
+        local Result = if Name == "" then "none" else Name
+        SaveManager.AutoSaveConfigCached = Result
+        return Result
+    end
+
+    SaveManager.AutoSaveConfigCached = "none"
+    return "none"
+end
+
+function SaveManager:SaveAutoSaveConfig(ConfigName: string): (boolean, string?)
+    SaveManager.AutoSaveConfigCached = ConfigName
+    SaveManager:CheckFolderTree()
+    local AutoSavePath = GetAutoSavePath()
+    if AutoSavePath == false then
+        return false, "Invalid path"
+    end
+
+    local SuccessWrite, ErrorMessage = pcall(writefile, AutoSavePath, ConfigName)
+    if not SuccessWrite then
+        return false, ErrorMessage
+    end
+
+    return true, ""
+end
+
+function SaveManager:DeleteAutoSaveConfig(): (boolean, string?)
+    SaveManager.AutoSaveConfigCached = "none"
+    SaveManager:CheckFolderTree()
+    local AutoSavePath = GetAutoSavePath()
+    if AutoSavePath == false then
+        return false, "Invalid path"
+    end
+
+    if not isfile(AutoSavePath) then
+        return false, "Auto-save config is not set"
+    end
+
+    local SuccessDelete, ErrorMessage = pcall(delfile, AutoSavePath)
+    if not SuccessDelete then
+        return false, ErrorMessage
+    end
+
+    return true, ""
+end
+
+function SaveManager:HookElementChanges()
+    local SaveId = 0
+
+    local function TriggerAutoSave()
+        if SaveManager.LoadingConfig then
+            return
+        end
+        if not SaveManager.ConfigLoaded then
+            return
+        end
+        local ActiveConfig = SaveManager:GetAutoSaveConfig()
+        if not ActiveConfig or ActiveConfig == "none" then
+            return
+        end
+
+        SaveId = SaveId + 1
+        local CurrentId = SaveId
+
+        task.delay(0.05, function()
+            if CurrentId == SaveId then
+                local Name = SaveManager:GetAutoSaveConfig()
+                if Name ~= "none" and SaveManager.CurrentConfig == Name then
+                    SaveManager:Save(Name)
+                end
+            end
+        end)
+    end
+
+    local function HookElement(Index, Element)
+        if not Element or typeof(Element) ~= "table" then return end
+        if SaveManager.Ignore[Index] then return end
+
+        local HasSetValue = typeof(Element.SetValue) == "function"
+        local HasSetValueRGB = typeof(Element.SetValueRGB) == "function"
+        
+        if not (HasSetValue or HasSetValueRGB) then return end
+        if Element.HookedForAutoSave then return end
+        Element.HookedForAutoSave = true
+
+        if HasSetValue then
+            local OriginalSetValue = Element.SetValue
+            Element.SetValue = function(SelfObj, ...)
+                local Results = table.pack(OriginalSetValue(SelfObj, ...))
+                if not SaveManager.Ignore[Index] and SaveManager:GetAutoSaveConfig() ~= "none" then
+                    TriggerAutoSave()
+                end
+                return table.unpack(Results, 1, Results.n)
+            end
+        end
+
+        if HasSetValueRGB then
+            local OriginalSetValueRGB = Element.SetValueRGB
+            Element.SetValueRGB = function(SelfObj, ...)
+                local Results = table.pack(OriginalSetValueRGB(SelfObj, ...))
+                if not SaveManager.Ignore[Index] and SaveManager:GetAutoSaveConfig() ~= "none" then
+                    TriggerAutoSave()
+                end
+                return table.unpack(Results, 1, Results.n)
+            end
+        end
+    end
+
+    for Index, Toggle in pairs(SaveManager.Library.Toggles) do
+        HookElement(Index, Toggle)
+    end
+    for Index, Option in pairs(SaveManager.Library.Options) do
+        HookElement(Index, Option)
+    end
+
+    local function SetupObserver(Tbl)
+        local Mt = getmetatable(Tbl)
+        if type(Mt) == "string" then return end
+        
+        Mt = Mt or {}
+        if Mt.__observerSetup then return end
+        Mt.__observerSetup = true
+        
+        local OriginalNewIndex = Mt.__newindex or rawset
+        
+        Mt.__newindex = function(T, K, V)
+            OriginalNewIndex(T, K, V)
+            if typeof(V) == "table" then
+                HookElement(K, V)
+            end
+        end
+        setmetatable(Tbl, Mt)
+    end
+
+    SetupObserver(SaveManager.Library.Toggles)
+    SetupObserver(SaveManager.Library.Options)
+end
+
+function SaveManager:StartAutoSaveLoop(ConfigName: string)
+    SaveManager.CurrentConfig = ConfigName
+    SaveManager.LoadingConfig = false
+    SaveManager:HookElementChanges()
+end
+
+function SaveManager:StopAutoSaveLoop()
 end
 
 --// Auto Load Config \\--
@@ -692,7 +880,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
     assert(SaveManager.Library, "Library is not set, call SaveManager:SetLibrary(Library) first.")
     local ConfigurationBox = Tab:AddRightGroupbox("Configuration", IconName or "folder-cog")
     
-    local ConfigNameInput, ConfigList, AutoloadConfigLabel
+    local ConfigNameInput, ConfigList, AutoloadConfigLabel, AutoSaveConfigLabel
     local function RefreshList()
         ConfigList:SetValues(SaveManager:RefreshConfigList())
         ConfigList:SetValue(nil)
@@ -700,12 +888,16 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
 
     local function RefreshAutoloadConfigLabel()
         local AutoloadConfigName, _Success, _ErrorMessage = SaveManager:GetAutoloadConfig()
-
         AutoloadConfigLabel:SetText(string.format("Current autoload config: %s", AutoloadConfigName))
         if ConfigList then RefreshList() end
     end
 
-    --// Create
+    local function RefreshAutoSaveConfigLabel()
+        local AutoSaveConfigName = SaveManager:GetAutoSaveConfig()
+        AutoSaveConfigLabel:SetText(string.format("Current auto-save config: %s", AutoSaveConfigName))
+        if ConfigList then RefreshList() end
+    end
+
     ConfigurationBox:AddInput("SaveManager_ConfigName", {
         Text = "Config name"
     })
@@ -747,7 +939,6 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
 
     ConfigurationBox:AddDivider()
 
-    --// Manage
     ConfigurationBox:AddDropdown("SaveManager_ConfigList", {
         Text = "Config list",
 
@@ -756,18 +947,24 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
         Multi = false,
 
         FormatDisplayValue = function(Value: any)
+            local Display = Value
             if Value == SaveManager.AutoloadConfig then
-                return string.format("%s (autoload)", Value)
+                Display = string.format("%s (autoload)", Display)
             end
-
-            return Value
+            if Value == SaveManager:GetAutoSaveConfig() then
+                Display = string.format("%s (autosave)", Display)
+            end
+            return Display
         end,
         FormatListValue = function(Value: any)
+            local Display = Value
             if Value == SaveManager.AutoloadConfig then
-                return string.format("%s (autoload)", Value)
+                Display = string.format("%s (autoload)", Display)
             end
-
-            return Value
+            if Value == SaveManager:GetAutoSaveConfig() then
+                Display = string.format("%s (autosave)", Display)
+            end
+            return Display
         end
     })
 
@@ -805,7 +1002,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
 
             ShowDialog(
                 function(): boolean
-                    return true --// Always show
+                    return true
                 end,
 
                 "SaveManager_OverwriteConfig",
@@ -839,7 +1036,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
 
             ShowDialog(
                 function(): boolean
-                    return true --// Always show
+                    return true
                 end,
 
                 "SaveManager_DeleteConfig",
@@ -856,14 +1053,55 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
 
                     SaveManager.Library:Notify(string.format("Successfully deleted config %q", ConfigName))
                     RefreshAutoloadConfigLabel()
+                    RefreshAutoSaveConfigLabel()
                 end
             )
         end
     })
 
+    ConfigurationBox:AddToggle("SaveManager_AutoSave", {
+        Text = "Auto Save Config",
+        Default = SaveManager:GetAutoSaveConfig() ~= "none",
+        Callback = function(State)
+            if State then
+                local ConfigName = SaveManager:GetAutoSaveConfig()
+                if ConfigName == "none" then
+                    ConfigName = ConfigList.Value
+                end
+                if IsStringEmpty(ConfigName) or ConfigName == "none" then
+                    SaveManager.Library:Notify("Please select a config to auto-save.")
+                    task.defer(function()
+                        local ToggleOpt = SaveManager.Library.Options.SaveManager_AutoSave
+                        if ToggleOpt then ToggleOpt:SetValue(false) end
+                    end)
+                    return
+                end
+
+                if not SaveManager.ConfigLoaded and SaveManager.CurrentConfig ~= ConfigName then
+                    local SuccessLoad, LoadErrorMessage = SaveManager:Load(ConfigName)
+                    if not SuccessLoad then
+                        SaveManager.Library:Notify("Failed to load config for auto-save: " .. tostring(LoadErrorMessage))
+                        task.defer(function()
+                            local ToggleOpt = SaveManager.Library.Options.SaveManager_AutoSave
+                            if ToggleOpt then ToggleOpt:SetValue(false) end
+                        end)
+                        return
+                    end
+                end
+
+                SaveManager:SaveAutoSaveConfig(ConfigName)
+                RefreshAutoSaveConfigLabel()
+                SaveManager:StartAutoSaveLoop(ConfigName)
+            else
+                SaveManager:DeleteAutoSaveConfig()
+                RefreshAutoSaveConfigLabel()
+                SaveManager:StopAutoSaveLoop()
+            end
+        end
+    })
+
     ConfigurationBox:AddButton("Refresh list", RefreshList)
 
-    --// Autoload Config
     ConfigurationBox:AddButton({
         Text = "Set as autoload",
         DoubleClick = false,
@@ -893,7 +1131,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
         Func = function()
             ShowDialog(
                 function(): boolean
-                    return true --// Always show
+                    return true
                 end,
 
                 "SaveManager_ResetAutoload",
@@ -915,19 +1153,26 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
         end
     })
 
-    AutoloadConfigLabel = ConfigurationBox:AddLabel("Current autoload config: ...", true);
+    AutoSaveConfigLabel = ConfigurationBox:AddLabel("Current auto-save config: ...", true)
+    AutoloadConfigLabel = ConfigurationBox:AddLabel("Current autoload config: ...", true)
 
-    --// Set variables
     ConfigNameInput, ConfigList = 
         SaveManager.Library.Options.SaveManager_ConfigName, 
-        SaveManager.Library.Options.SaveManager_ConfigList;
+        SaveManager.Library.Options.SaveManager_ConfigList
 
-    --// Refresh
     RefreshAutoloadConfigLabel()
-    SaveManager:SetIgnoreIndexes({ "SaveManager_ConfigList", "SaveManager_ConfigName" })
+    RefreshAutoSaveConfigLabel()
+
+    local InitialAutoSave = SaveManager:GetAutoSaveConfig()
+    if InitialAutoSave ~= "none" then
+        SaveManager:StartAutoSaveLoop(InitialAutoSave)
+    end
+
+    SaveManager:SetIgnoreIndexes({ "SaveManager_ConfigList", "SaveManager_ConfigName", "SaveManager_AutoSave" })
 
     return ConfigurationBox
 end
 
 SaveManager:BuildFolderTree()
 return SaveManager
+
