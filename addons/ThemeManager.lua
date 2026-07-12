@@ -429,7 +429,7 @@ function ThemeManager:SetDefaultTheme(Theme: any)
 
     --// Apply
     Library.Scheme = LibraryScheme
-    ThemeManager.BuiltInThemes["Default"] = { 1, FinalTheme }
+    ThemeManager.BuiltInThemes["Demara"] = { 1, FinalTheme }
 
     Library:UpdateColorsUsingRegistry()
 end
