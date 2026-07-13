@@ -1,4 +1,3 @@
--- // Original version of UI Library: Obsidian
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
