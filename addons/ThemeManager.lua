@@ -1,12 +1,27 @@
-local cloneref = (cloneref or clonereference or function(instance: any)
-    return instance
+local cloneref = (cloneref or clonereference or function(i)
+    return i
 end)
 local clonefunction = (clonefunction or copyfunction or function(func) 
     return func 
 end)
 
-local HttpService: HttpService = cloneref(game:GetService("HttpService"))
-local isfolder, isfile, listfiles = isfolder, isfile, listfiles
+local HttpService = cloneref(game:GetService("HttpService"))
+local o_isfolder, o_isfile, o_listfiles = isfolder, isfile, listfiles
+
+local function isfolder(p)
+    local s, r = pcall(o_isfolder, p)
+    return s and r == true
+end
+
+local function isfile(p)
+    local s, r = pcall(o_isfile, p)
+    return s and r == true
+end
+
+local function listfiles(p)
+    local s, r = pcall(o_listfiles, p)
+    return s and type(r) == "table" and r or {}
+end
 
 if typeof(clonefunction) == "function" then
     -- Fix is_____ functions for shitsploits, those functions should never error, only return a boolean.
