@@ -381,30 +381,31 @@ end
 
 --// Config Management \\--
 function SaveManager:RefreshConfigList()
-    local SettingsPath = GetCurrentSettingsPath()
-    if SettingsPath == false then
+    local p = GetCurrentSettingsPath()
+    if p == false then
         return {}
     end
 
-    local SuccessList, Files = pcall(listfiles, SettingsPath)
-    if not (SuccessList and typeof(Files) == "table") then
-        SaveManager.Library:Notify(string.format("Failed to load config list: %s", tostring(Files)))
+    local ok, fs = pcall(listfiles, p)
+    if not (ok and typeof(fs) == "table") then
+        SaveManager.Library:Notify(string.format("Failed to load config list: %s", tostring(fs)))
         return {}
     end
 
-    local FileNames = {}
-    for _, FilePath in Files do
-        local RawFileName = FilePath:match("(.+)%..+$")
-        if not RawFileName then continue end
+    local ns = {}
+    for _, f in fs do
+        if not f:lower():match("%.json$") then continue end
+        local rf = f:match("(.+)%..+$")
+        if not rf then continue end
 
-        local Position = RawFileName:gsub("\\", "/"):find("/[^/]*$")
-        local FileName = Position and RawFileName:sub(Position + 1) or RawFileName
-        if not FileName or FileName == "autoload" then continue end
+        local pos = rf:gsub("\\", "/"):find("/[^/]*$")
+        local fn = pos and rf:sub(pos + 1) or rf
+        if not fn or fn == "autoload" or fn == "autosave" then continue end
 
-        table.insert(FileNames, FileName)
+        table.insert(ns, fn)
     end
 
-    return FileNames
+    return ns
 end
 
 function SaveManager:Save(ConfigName: string): (boolean, string?)
