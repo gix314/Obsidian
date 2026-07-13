@@ -1,3 +1,10 @@
+## 11.07.2026
+
+```diff
+[changes]
++ Loading configs now triggers element callbacks even if their value hasn't changed
+```
+
 ## 09.07.2026
 
 ```diff

@@ -115,7 +115,10 @@ local ElementParser = {}; do
         end,
         function(Element: any?, Data: any)
             if not Element then return end
-            if Element.Value == Data.value then return end
+            if Element.Value == Data.value then
+                Element:RunChanged()
+                return
+            end
             
             Element:SetValue(Data.value)
         end
@@ -128,7 +131,10 @@ local ElementParser = {}; do
         end,
         function(Element: any?, Data: any)
             if not Element then return end
-            if Element.Value == Data.value then return end
+            if Element.Value == Data.value then
+                Element:RunChanged()
+                return
+            end
 
             Element:SetValue(Data.value)
         end
@@ -141,7 +147,10 @@ local ElementParser = {}; do
         end,
         function(Element: any?, Data: any)
             if not Element then return end
-            if Element.Value == Data.value then return end
+            if Element.Value == Data.value then
+                Element:RunChanged()
+                return
+            end
             
             Element:SetValue(Data.value)
         end
@@ -183,7 +192,11 @@ local ElementParser = {}; do
         function(Element: any?, Data: any)
             if not Element then return end
             if typeof(Data.text) ~= "string" then return end
-            if Element.Value == Data.text then return end
+
+            if Element.Value == Data.text then
+                Element:RunChanged()
+                return
+            end
 
             Element:SetValue(Data.text)
         end
@@ -529,7 +542,7 @@ function SaveManager:Load(ConfigName: string): (boolean, string?)
         local Parser = ElementParser[Option.type]
         if not Parser then continue end
 
-        task.spawn(Parser.Load, Option.idx, Option)
+        task.defer(Parser.Load, Option.idx, Option)
     end
 
     task.delay(1, function()
