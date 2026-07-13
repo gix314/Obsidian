@@ -655,95 +655,75 @@ function SaveManager:DeleteAutoSaveConfig(): (boolean, string?)
 end
 
 function SaveManager:HookElementChanges()
-    local SaveId = 0
+    local sid = 0
 
-    local function TriggerAutoSave()
-        if SaveManager.LoadingConfig then
+    local function trigger()
+        if SaveManager.LoadingConfig or not SaveManager.ConfigLoaded then
             return
         end
-        if not SaveManager.ConfigLoaded then
-            return
-        end
-        local ActiveConfig = SaveManager:GetAutoSaveConfig()
-        if not ActiveConfig or ActiveConfig == "none" then
+        local cfg = SaveManager:GetAutoSaveConfig()
+        if not cfg or cfg == "none" then
             return
         end
 
-        SaveId = SaveId + 1
-        local CurrentId = SaveId
+        sid = sid + 1
+        local cid = sid
 
         task.delay(0.05, function()
-            if CurrentId == SaveId then
-                local Name = SaveManager:GetAutoSaveConfig()
-                if Name ~= "none" and SaveManager.CurrentConfig == Name then
-                    SaveManager:Save(Name)
+            if cid == sid then
+                local nm = SaveManager:GetAutoSaveConfig()
+                if nm ~= "none" and SaveManager.CurrentConfig == nm then
+                    SaveManager:Save(nm)
                 end
             end
         end)
     end
 
-    local function HookElement(Index, Element)
-        if not Element or typeof(Element) ~= "table" then return end
-        if SaveManager.Ignore[Index] then return end
+    local function hook(idx, el)
+        if not el or typeof(el) ~= "table" then return end
+        if SaveManager.Ignore[idx] then return end
+        if el.HookedForAutoSave then return end
 
-        local HasSetValue = typeof(Element.SetValue) == "function"
-        local HasSetValueRGB = typeof(Element.SetValueRGB) == "function"
-        
-        if not (HasSetValue or HasSetValueRGB) then return end
-        if Element.HookedForAutoSave then return end
-        Element.HookedForAutoSave = true
-
-        if HasSetValue then
-            local OriginalSetValue = Element.SetValue
-            Element.SetValue = function(SelfObj, ...)
-                local Results = table.pack(OriginalSetValue(SelfObj, ...))
-                if not SaveManager.Ignore[Index] and SaveManager:GetAutoSaveConfig() ~= "none" then
-                    TriggerAutoSave()
+        local rc = el.RunChanged
+        if typeof(rc) == "function" then
+            el.HookedForAutoSave = true
+            el.RunChanged = function(self, ...)
+                local res = table.pack(rc(self, ...))
+                if not SaveManager.Ignore[idx] and SaveManager:GetAutoSaveConfig() ~= "none" then
+                    trigger()
                 end
-                return table.unpack(Results, 1, Results.n)
-            end
-        end
-
-        if HasSetValueRGB then
-            local OriginalSetValueRGB = Element.SetValueRGB
-            Element.SetValueRGB = function(SelfObj, ...)
-                local Results = table.pack(OriginalSetValueRGB(SelfObj, ...))
-                if not SaveManager.Ignore[Index] and SaveManager:GetAutoSaveConfig() ~= "none" then
-                    TriggerAutoSave()
-                end
-                return table.unpack(Results, 1, Results.n)
+                return table.unpack(res, 1, res.n)
             end
         end
     end
 
-    for Index, Toggle in pairs(SaveManager.Library.Toggles) do
-        HookElement(Index, Toggle)
+    for k, v in pairs(SaveManager.Library.Toggles) do
+        hook(k, v)
     end
-    for Index, Option in pairs(SaveManager.Library.Options) do
-        HookElement(Index, Option)
+    for k, v in pairs(SaveManager.Library.Options) do
+        hook(k, v)
     end
 
-    local function SetupObserver(Tbl)
-        local Mt = getmetatable(Tbl)
-        if type(Mt) == "string" then return end
+    local function setup(tbl)
+        local mt = getmetatable(tbl)
+        if type(mt) == "string" then return end
         
-        Mt = Mt or {}
-        if Mt.__observerSetup then return end
-        Mt.__observerSetup = true
+        mt = mt or {}
+        if mt.__observerSetup then return end
+        mt.__observerSetup = true
         
-        local OriginalNewIndex = Mt.__newindex or rawset
-        
-        Mt.__newindex = function(T, K, V)
-            OriginalNewIndex(T, K, V)
-            if typeof(V) == "table" then
-                HookElement(K, V)
+        local raw = mt.__newindex or rawset
+        mt.__newindex = function(t, k, v)
+            raw(t, k, v)
+            if typeof(v) == "table" then
+                hook(k, v)
             end
         end
-        setmetatable(Tbl, Mt)
+        setmetatable(tbl, mt)
     end
 
-    SetupObserver(SaveManager.Library.Toggles)
-    SetupObserver(SaveManager.Library.Options)
+    setup(SaveManager.Library.Toggles)
+    setup(SaveManager.Library.Options)
 end
 
 function SaveManager:StartAutoSaveLoop(ConfigName: string)
