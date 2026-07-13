@@ -383,7 +383,6 @@ function ThemeManager:SetDefaultTheme(Theme: any)
     local Library = ThemeManager.Library
     local DefaultThemeData = ThemeManager.BuiltInThemes["Demara"][2]
 
-    -- Safely parse theme inputs to support default theme setups
     if Theme == nil or Theme == "Default" or Theme == (ThemeManager.BuiltInThemes["Default"] or {}) then
         Theme = DefaultThemeData
     elseif typeof(Theme) == "string" then
@@ -475,17 +474,19 @@ end
 
 function ThemeManager:LoadDefault()
     local ThemeName, Success, FetchErrorMessage = ThemeManager:GetDefaultTheme()
-    if not Success or FetchErrorMessage then
-        if FetchErrorMessage ~= "Default theme is not set" then
+    
+    if not Success then
+        if FetchErrorMessage == "Default theme is not set" then
+            ThemeName = "Demara"
+        else
             ThemeManager.Library:Notify(string.format("Failed to apply default theme: %s", FetchErrorMessage))
+            return
         end
-
-        return
     end
 
     if not ThemeManager:GetCustomTheme(ThemeName) then
         ThemeManager.Library.Options.ThemeManager_ThemeList:SetValue(ThemeName)
-        ThemeManager:ApplyTheme(ThemeName) -- Force apply built-in themes directly to bypass dropdown loops
+        ThemeManager:ApplyTheme(ThemeName)
         return
     end
 
@@ -538,7 +539,6 @@ function ThemeManager:ApplyTheme(ThemeName: string)
         return false, "No theme is selected"
     end
 
-    -- Automatically redirect "Default" scheme requests from external scripts to your "Demara" scheme
     if ThemeName == "Default" then
         ThemeName = "Demara"
     end
