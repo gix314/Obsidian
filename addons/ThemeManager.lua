@@ -186,7 +186,7 @@ local function GetThemePath(ThemeName: string): false | string
 end
 
 local function DoesThemeExist(ThemeName: string, IncludeBuiltIn: boolean): boolean
-    if ThemeManager.BuiltInThemes[ThemeName] then
+    if ThemeName == "Default" or ThemeManager.BuiltInThemes[ThemeName] then
         return true
     end
 
@@ -383,6 +383,20 @@ function ThemeManager:SetDefaultTheme(Theme: any)
     local Library = ThemeManager.Library
     local DefaultThemeData = ThemeManager.BuiltInThemes["Demara"][2]
 
+    -- Safely parse theme inputs to support default theme setups
+    if Theme == nil or Theme == "Default" or Theme == (ThemeManager.BuiltInThemes["Default"] or {}) then
+        Theme = DefaultThemeData
+    elseif typeof(Theme) == "string" then
+        local found = ThemeManager.BuiltInThemes[Theme]
+        Theme = found and found[2] or DefaultThemeData
+    elseif typeof(Theme) == "table" then
+        if Theme[2] and typeof(Theme[2]) == "table" then
+            Theme = Theme[2]
+        end
+    else
+        Theme = DefaultThemeData
+    end
+
     local LibraryScheme = {}
     local FinalTheme = {}
 
@@ -429,7 +443,7 @@ function ThemeManager:SetDefaultTheme(Theme: any)
 
     --// Apply
     Library.Scheme = LibraryScheme
-    ThemeManager.BuiltInThemes["Default"] = { 1, FinalTheme }
+    ThemeManager.BuiltInThemes["Demara"] = { 1, FinalTheme }
 
     Library:UpdateColorsUsingRegistry()
 end
@@ -471,6 +485,7 @@ function ThemeManager:LoadDefault()
 
     if not ThemeManager:GetCustomTheme(ThemeName) then
         ThemeManager.Library.Options.ThemeManager_ThemeList:SetValue(ThemeName)
+        ThemeManager:ApplyTheme(ThemeName) -- Force apply built-in themes directly to bypass dropdown loops
         return
     end
 
@@ -521,6 +536,11 @@ end
 function ThemeManager:ApplyTheme(ThemeName: string)
     if IsStringEmpty(ThemeName) then
         return false, "No theme is selected"
+    end
+
+    -- Automatically redirect "Default" scheme requests from external scripts to your "Demara" scheme
+    if ThemeName == "Default" then
+        ThemeName = "Demara"
     end
 
     local CustomThemeData = ThemeManager:GetCustomTheme(ThemeName)
