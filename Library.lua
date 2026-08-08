@@ -1224,7 +1224,7 @@ function IsValidCustomIcon(Icon: string)
 end
 
 local function IsCustomAssetIcon(Icon: string, IncludeAssetId: boolean)
-    return typeof(Icon) == "string" and (Icon:match("^content://") or Icon:match("^rbxasset://%x+/") or (IncludeAssetId == true and Icon:match("^rbxassetid://")))
+    return typeof(Icon) == "string" and (Icon:match("^content://") or (Icon:match("^rbxasset://%x+/") or Icon:match("^rbxasset://[^/]+/")) or (IncludeAssetId == true and Icon:match("^rbxassetid://")))
 end
 
 type Icon = {
@@ -1242,12 +1242,12 @@ type IconModule = {
 
 local FetchIcons, Icons = pcall(function()
     return (loadstring(
-        game:HttpGet("https://gitlab.com/upio/lucide-roblox-direct/-/raw/main/source.lua")
+        game:HttpGet("https://raw.githubusercontent.com/mstudio45/lucide-roblox-direct/refs/heads/main/source.lua")
     ) :: () -> IconModule)()
 end)
 
 function Library:GetIcon(IconName: string)
-    if not FetchIcons then
+    if not FetchIcons or not Icons then
         return
     end
 
@@ -8772,9 +8772,9 @@ function Library:CreateWindow(WindowInfo)
         if WindowInfo.Icon then
             local Icon = Library:GetCustomIcon(WindowInfo.Icon)
             WindowIcon = New("ImageLabel", {
-                Image = Icon.Url,
-                ImageRectOffset = Icon.ImageRectOffset,
-                ImageRectSize = Icon.ImageRectSize,
+                Image = Icon and Icon.Url or "",
+                ImageRectOffset = Icon and Icon.ImageRectOffset or Vector2.zero,
+                ImageRectSize = Icon and Icon.ImageRectSize or Vector2.zero,
                 Size = WindowInfo.IconSize,
                 Parent = TitleHolder,
             })
@@ -9340,16 +9340,19 @@ function Library:CreateWindow(WindowInfo)
         local Name = nil
         local Icon = nil
         local Description = nil
+        local Order = nil
 
         if select("#", ...) == 1 and typeof(...) == "table" then
             local Info = select(1, ...)
             Name = Info.Name or "Tab"
             Icon = Info.Icon
             Description = Info.Description
+            Order = Info.Order
         else
             Name = select(1, ...)
             Icon = select(2, ...)
             Description = select(3, ...)
+            Order = select(4, ...)
         end
 
         local TabButton
@@ -9368,6 +9371,7 @@ function Library:CreateWindow(WindowInfo)
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 40),
                 Text = "",
+                LayoutOrder = Order,
                 Parent = Tabs,
             })
             local ButtonPadding = New("UIPadding", {
@@ -10424,6 +10428,10 @@ function Library:CreateWindow(WindowInfo)
             end
         end
 
+        function Tab:SetOrder(Order: number)
+            TabButton.LayoutOrder = Order
+        end
+
         function Tab:Destroy()
             Tab.Destroyed = true
 
@@ -10934,20 +10942,17 @@ function Library:CreateWindow(WindowInfo)
         if Info.Icon then
             local ParsedIcon = Library:GetCustomIcon(Info.Icon)
             if ParsedIcon then
-                local IconImg = New("ImageLabel", {
+                local _IconImg = New("ImageLabel", {
                     BackgroundTransparency = 1,
                     Size = UDim2.fromOffset(16, 16),
                     Image = ParsedIcon.Url,
-                    ImageColor3 = "FontColor",
+                    ImageColor3 = Info.TitleColor or "FontColor",
                     ImageRectOffset = ParsedIcon.ImageRectOffset,
                     ImageRectSize = ParsedIcon.ImageRectSize,
                     LayoutOrder = 1,
                     ZIndex = 9002,
                     Parent = TitleRow,
                 })
-                if Info.TitleColor then
-                    IconImg.ImageColor3 = Info.TitleColor
-                end
             end
         end
 
@@ -10957,14 +10962,12 @@ function Library:CreateWindow(WindowInfo)
             AutomaticSize = Enum.AutomaticSize.Y,
             Text = Info.Title,
             TextSize = 18,
+            TextColor3 = Info.TitleColor or "FontColor",
             TextXAlignment = Enum.TextXAlignment.Left,
             LayoutOrder = 2,
             ZIndex = 9002,
             Parent = TitleRow,
         })
-        if Info.TitleColor then
-            TitleLabel.TextColor3 = Info.TitleColor
-        end
 
         local DescriptionLabel = New("TextLabel", {
             BackgroundTransparency = 1,
@@ -10974,14 +10977,12 @@ function Library:CreateWindow(WindowInfo)
             TextSize = 14,
             TextTransparency = Info.DescriptionColor and 0 or 0.2,
             TextXAlignment = Enum.TextXAlignment.Left,
+            TextColor3 = Info.DescriptionColor or "FontColor",
             TextWrapped = true,
             LayoutOrder = 2,
             ZIndex = 9002,
             Parent = HeaderContainer,
         })
-        if Info.DescriptionColor then
-            DescriptionLabel.TextColor3 = Info.DescriptionColor
-        end
 
         DialogContainer = New("Frame", {
             BackgroundTransparency = 1,
@@ -11718,9 +11719,9 @@ function Library:CreateLoading(LoadingInfo)
     if LoadingInfo.Icon then
         local Icon = Library:GetCustomIcon(LoadingInfo.Icon)
         local _WindowIcon = New("ImageLabel", {
-            Image = Icon.Url,
-            ImageRectOffset = Icon.ImageRectOffset,
-            ImageRectSize = Icon.ImageRectSize,
+            Image = Icon and Icon.Url or "",
+            ImageRectOffset = Icon and Icon.ImageRectOffset or Vector2.zero,
+            ImageRectSize = Icon and Icon.ImageRectSize or Vector2.zero,
             Size = LoadingInfo.IconSize,
             Parent = TitleHolder,
         })
@@ -11785,9 +11786,9 @@ function Library:CreateLoading(LoadingInfo)
         BackgroundTransparency = 1,
         Position = UDim2.fromScale(0.5, 0.5),
         Size = UDim2.fromScale(1, 1),
-        Image = LoaderIcon.Url,
-        ImageRectOffset = LoaderIcon.ImageRectOffset,
-        ImageRectSize = LoaderIcon.ImageRectSize,
+        Image = LoaderIcon and LoaderIcon.Url or "",
+        ImageRectOffset = LoaderIcon and LoaderIcon.ImageRectOffset or Vector2.zero,
+        ImageRectSize = LoaderIcon and LoaderIcon.ImageRectSize or Vector2.zero,
         ImageColor3 = LoadingInfo.LoadingIconColor or ((LoadingInfo.LoadingIcon == Templates.Loading.LoadingIcon) and "AccentColor" or "WhiteColor"),
         Parent = IconHolder,
     })
@@ -12035,6 +12036,8 @@ function Library:CreateLoading(LoadingInfo)
 
     function Loading:SetLoadingIcon(Icon)
         local IconData = Library:GetCustomIcon(Icon)
+        assert(IconData, "Image must be a valid Roblox asset or a valid URL or a valid lucide icon.")
+
         LoadingIcon.Image = IconData.Url
         LoadingIcon.ImageRectOffset = IconData.ImageRectOffset
         LoadingIcon.ImageRectSize = IconData.ImageRectSize
