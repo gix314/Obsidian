@@ -11621,7 +11621,7 @@ function Library:CreateWindow(WindowInfo)
 
         do
             local BellIcon = Library:GetIcon("bell")
-            local BellRightOffset = 42
+            local BellRightOffset = WindowInfo.Minimizable and 72 or 42
 
             local BellButton = New("TextButton", {
                 AnchorPoint = Vector2.new(1, 0.5),
@@ -11714,7 +11714,7 @@ function Library:CreateWindow(WindowInfo)
 
         do
             local FeaturesIcon = Library:GetIcon("sliders-horizontal") or Library:GetIcon("list")
-            local FeaturesRightOffset = 72
+            local FeaturesRightOffset = (WindowInfo.Minimizable and 72 or 42) + 30
 
             local FeaturesButton = New("TextButton", {
                 AnchorPoint = Vector2.new(1, 0.5),
