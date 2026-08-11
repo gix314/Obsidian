@@ -14181,8 +14181,8 @@ function Library:CreateWindow(WindowInfo)
                             TweenService:Create(btnIcon, Library.TweenInfo, { ImageTransparency = 0 }):Play()
                         end
 
-                        if SubTab.SidebarEntry then
-                            SubTab.SidebarEntry:SetActive(true)
+                        if subTab.SidebarEntry then
+                            subTab.SidebarEntry:SetActive(true)
                         end
 
                         Tab.ActiveSubTab = subTab
@@ -14210,8 +14210,8 @@ function Library:CreateWindow(WindowInfo)
                             TweenService:Create(btnIcon, Library.TweenInfo, { ImageTransparency = SUBTAB_IDLE_TRANSPARENCY }):Play()
                         end
 
-                        if SubTab.SidebarEntry then
-                            SubTab.SidebarEntry:SetActive(false)
+                        if subTab.SidebarEntry then
+                            subTab.SidebarEntry:SetActive(false)
                         end
 
                         Library:PlayTabAnimation(subCanvas, false)
@@ -14224,8 +14224,8 @@ function Library:CreateWindow(WindowInfo)
                     function subTab:SetVisible(vis)
                         btn.Visible = vis
 
-                        if SubTab.SidebarEntry then
-                            SubTab.SidebarEntry:SetVisible(Visible)
+                        if subTab.SidebarEntry then
+                            subTab.SidebarEntry:SetVisible(vis)
                         end
                         if not vis then
                             btnScale.Scale = 1
@@ -14249,9 +14249,9 @@ function Library:CreateWindow(WindowInfo)
                     function subTab:Destroy()
                         subTab.Destroyed = true
 
-                        if SubTab.SidebarEntry then
-                            SubTab.SidebarEntry:Destroy()
-                            SubTab.SidebarEntry = nil
+                        if subTab.SidebarEntry then
+                            subTab.SidebarEntry:Destroy()
+                            subTab.SidebarEntry = nil
                         end
 
                         for _, conn in subTab.Connections do
@@ -14291,7 +14291,7 @@ function Library:CreateWindow(WindowInfo)
 
                     Tab.SubTabs[sName] = subTab
 
-                    SubTab.SidebarEntry = CreateSidebarEntry(SubTab, SubName, SubIcon)
+                    subTab.SidebarEntry = CreateSidebarEntry(subTab, sName, sIcon)
 
                     if not Tab.ActiveSubTab then
                         subTab:Show()
