@@ -396,6 +396,7 @@ local Templates = {
         AutoShow = true,
         Center = true,
         Resizable = true,
+        AlwaysOnTop = false,
 
         SearchbarSize = UDim2.fromScale(0.35, 1),
         GlobalSearch = false,
@@ -462,6 +463,8 @@ local Templates = {
         Title = "mspaint",
         Icon = 95816097006870,
         IconSize = UDim2.fromOffset(30, 30),
+
+        AlwaysOnTop = true,
 
         LoadingIcon = CustomImageManager.GetAsset("LoadingIcon"),
         LoadingIconColor = nil,
@@ -11741,6 +11744,11 @@ function Library:CreateWindow(WindowInfo)
                 WindowInfo.Footer = f
             end
 
+            function Window:SetAlwaysOnTop(en: boolean)
+                WindowInfo.AlwaysOnTop = en == true
+                SetAlwaysOnTop(Library.ScreenGui, WindowInfo.AlwaysOnTop)
+            end
+
             function Window:SetCornerRadius(r)
                 assert(typeof(r) == "number", "Expected number for Radius got: " .. typeof(r))
                 r = math.min(r, 20)
@@ -12764,289 +12772,235 @@ function Library:CreateWindow(WindowInfo)
                     return self:AddTabbox({ Side = 2, Name = Name })
                 end
 
-                function Tab:AddGroupbox(Info)
-                    local Owner = self or Tab
+                function Tab:AddGroupbox(i)
+                    local o = self or Tab
+                    local s = i.Side or 1
+                    if typeof(s) == "string" then
+                        s = s:lower() == "left" and 1 or 2
+                    end
 
-                    local BoxHolder = New("Frame", {
+                    local bh = New("Frame", {
                         AutomaticSize = Enum.AutomaticSize.Y,
                         BackgroundTransparency = 1,
                         Size = UDim2.fromScale(1, 0),
-                        Parent = Info.Side == 1 and Owner.Sides[1] or Owner.Sides[2],
+                        Parent = s == 1 and o.Sides[1] or o.Sides[2],
                     })
-                    New("UIListLayout", {
-                        Padding = UDim.new(0, 6),
-                        Parent = BoxHolder,
+                    New("UIListLayout", { Padding = UDim.new(0, 6), Parent = bh })
+                    New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = bh })
+
+                    local gh = New("Frame", {
+                        BackgroundColor3 = "BackgroundColor",
+                        Size = UDim2.fromScale(1, 0),
+                        Parent = bh,
                     })
-                    New("UIPadding", {
-                        PaddingBottom = UDim.new(0, 4),
-                        PaddingTop = UDim.new(0, 4),
-                        Parent = BoxHolder,
+                    table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, WindowInfo.CornerRadius), Parent = gh }))
+                    New("UIListLayout", { Parent = gh })
+                    Library:AddOutline(gh)
+
+                    local gt = New("Frame", {
+                        AutomaticSize = Enum.AutomaticSize.Y,
+                        BackgroundTransparency = 1,
+                        Size = UDim2.fromScale(1, 0),
+                        Parent = gh,
                     })
+                    New("UIPadding", { PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6), PaddingTop = UDim.new(0, 6), Parent = gt })
 
-                    local GroupboxHolder
-                    local GroupboxLabel
-
-                    local GroupboxContainer
-                    local GroupboxList
-
-                    local GroupboxCollapseArrow
-                    local GroupboxLine
-
-                    do
-                        GroupboxHolder = New("Frame", {
-                            BackgroundColor3 = "BackgroundColor",
-                            Size = UDim2.fromScale(1, 0),
-                            Parent = BoxHolder,
-                        })
-                        table.insert(
-                            Library.Corners,
-                            New("UICorner", {
-                                CornerRadius = UDim.new(0, WindowInfo.CornerRadius),
-                                Parent = GroupboxHolder,
-                            })
-                        )
-                        Library:AddOutline(GroupboxHolder)
-
-                        GroupboxLine = Library:MakeLine(GroupboxHolder, {
-                            Position = UDim2.fromOffset(0, 34),
-                            Size = UDim2.new(1, 0, 0, 1),
-                        })
-
-                        local BoxIcon = Library:GetCustomIcon(Info.IconName)
-                        if BoxIcon then
-                            New("ImageLabel", {
-                                Image = BoxIcon.Url,
-                                ImageColor3 = BoxIcon.Custom and "WhiteColor" or "AccentColor",
-                                ImageRectOffset = BoxIcon.ImageRectOffset,
-                                ImageRectSize = BoxIcon.ImageRectSize,
-                                Position = UDim2.fromOffset(6, 6),
-                                Size = UDim2.fromOffset(22, 22),
-                                Parent = GroupboxHolder,
-                            })
-                        end
-
-                        GroupboxLabel = New("TextLabel", {
-                            BackgroundTransparency = 1,
-                            Position = UDim2.fromOffset(BoxIcon and 24 or 0, 0),
-                            Size = UDim2.new(1, 0, 0, 34),
-                            Text = Info.Name,
-                            TextSize = 15,
-                            TextXAlignment = Enum.TextXAlignment.Left,
-                            Parent = GroupboxHolder,
-                        })
-                        New("UIPadding", {
-                            PaddingLeft = UDim.new(0, 12),
-                            PaddingRight = UDim.new(0, 12),
-                            Parent = GroupboxLabel,
-                        })
-
-                        if Info.DisableCollapsing ~= true then
-                            GroupboxCollapseArrow = New("ImageButton", {
-                                Image = ArrowIcon and ArrowIcon.Url or "",
-                                ImageColor3 = "WhiteColor",
-                                ImageRectOffset = ArrowIcon and ArrowIcon.ImageRectOffset or Vector2.zero,
-                                ImageRectSize = ArrowIcon and ArrowIcon.ImageRectSize or Vector2.zero,
-                                BackgroundTransparency = 1,
-                                Rotation = 180,
-                                Position = UDim2.new(1, -(22 + 6), 0, 6),
-                                Size = UDim2.fromOffset(22, 22),
-                                Parent = GroupboxHolder,
-                            })
-                        end
-
-                        GroupboxContainer = New("Frame", {
-                            BackgroundTransparency = 1,
-                            Position = UDim2.fromOffset(0, 35),
-                            Size = UDim2.new(1, 0, 1, -35),
-                            Parent = GroupboxHolder,
-                        })
-
-                        GroupboxList = New("UIListLayout", {
-                            Padding = UDim.new(0, 8),
-                            Parent = GroupboxContainer,
-                        })
-                        New("UIPadding", {
-                            PaddingBottom = UDim.new(0, 7),
-                            PaddingLeft = UDim.new(0, 7),
-                            PaddingRight = UDim.new(0, 7),
-                            PaddingTop = UDim.new(0, 7),
-                            Parent = GroupboxContainer,
+                    local bi = Library:GetCustomIcon(i.IconName)
+                    if bi then
+                        New("ImageLabel", {
+                            AnchorPoint = Vector2.new(0, 0.5),
+                            Image = bi.Url,
+                            ImageColor3 = bi.Custom and "WhiteColor" or "AccentColor",
+                            ImageRectOffset = bi.ImageRectOffset,
+                            ImageRectSize = bi.ImageRectSize,
+                            Position = UDim2.fromScale(0, 0.5),
+                            Size = UDim2.fromOffset(22, 22),
+                            Parent = gt,
                         })
                     end
 
-                    local Groupbox = {
-                        Type = "Groupbox",
+                    local tf = New("Frame", {
+                        AutomaticSize = Enum.AutomaticSize.Y,
+                        BackgroundTransparency = 1,
+                        Position = UDim2.fromOffset(bi and 24 or 0, 0),
+                        Size = UDim2.new(1, -22 - (bi and 24 or 0), 0, 0),
+                        Parent = gt,
+                    })
+                    New("UIListLayout", { Parent = tf })
+                    New("UIPadding", { PaddingBottom = UDim.new(0, 3), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6), PaddingTop = UDim.new(0, 3), Parent = tf })
 
+                    local gl = New("TextLabel", {
+                        AutomaticSize = Enum.AutomaticSize.Y,
+                        BackgroundTransparency = 1,
+                        Size = UDim2.fromScale(1, 0),
+                        Text = i.Name,
+                        TextSize = 15,
+                        TextWrapped = true,
+                        TextXAlignment = Enum.TextXAlignment.Left,
+                        Parent = tf,
+                    })
+                    New("UIPadding", { PaddingBottom = UDim.new(0, 1), Parent = gl })
+
+                    local gd = New("TextLabel", {
+                        AutomaticSize = Enum.AutomaticSize.Y,
+                        BackgroundTransparency = 1,
+                        Size = UDim2.fromScale(1, 0),
+                        Text = i.Description or "",
+                        TextSize = 14,
+                        TextTransparency = 0.5,
+                        TextWrapped = true,
+                        TextXAlignment = Enum.TextXAlignment.Left,
+                        Visible = (i.Description ~= nil),
+                        Parent = tf,
+                    })
+
+                    local gca
+                    if i.DisableCollapsing ~= true then
+                        gca = New("ImageButton", {
+                            AnchorPoint = Vector2.new(1, 0.5),
+                            BackgroundTransparency = 1,
+                            Image = ArrowIcon and ArrowIcon.Url or "",
+                            ImageColor3 = "WhiteColor",
+                            ImageRectOffset = ArrowIcon and ArrowIcon.ImageRectOffset or Vector2.zero,
+                            ImageRectSize = ArrowIcon and ArrowIcon.ImageRectSize or Vector2.zero,
+                            Rotation = 180,
+                            Position = UDim2.fromScale(1, 0.5),
+                            Size = UDim2.fromOffset(22, 22),
+                            Parent = gt,
+                        })
+                    end
+
+                    local gln = Library:MakeLine(gh, {
+                        LayoutOrder = 1,
+                        Size = UDim2.new(1, 0, 0, 1),
+                    })
+
+                    local gc = New("Frame", {
+                        BackgroundTransparency = 1,
+                        LayoutOrder = 2,
+                        Size = UDim2.fromScale(1, 0),
+                        Parent = gh,
+                    })
+                    local glist = New("UIListLayout", { Padding = UDim.new(0, 8), Parent = gc })
+                    New("UIPadding", { PaddingBottom = UDim.new(0, 7), PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7), PaddingTop = UDim.new(0, 7), Parent = gc })
+
+                    local gbox = {
+                        Type = "Groupbox",
                         Connections = {},
                         Destroyed = false,
-
                         Visible = true,
                         Collapsed = false,
-
-                        BoxHolder = BoxHolder,
-                        Holder = GroupboxHolder,
-                        Container = GroupboxContainer,
-
+                        BoxHolder = bh,
+                        Holder = gh,
+                        Container = gc,
                         Tab = Tab,
                         DependencyBoxes = {},
                         Elements = {}
                     }
 
-                    local ResizeTween
-                    local CollapseArrowTween
+                    local rzT, caT
 
-                    function Groupbox:Resize()
-                        if ResizeTween then
-                            StopTween(ResizeTween, true)
-                            ResizeTween = nil
-                        end
+                    function gbox:Resize()
+                        if rzT then StopTween(rzT, true) rzT = nil end
+                        local tS = (gt.AbsoluteSize.Y / Library.DPIScale)
+                        local cS = (glist.AbsoluteContentSize.Y / Library.DPIScale) + 14
+                        local tgS = UDim2.new(1, 0, 0, if gbox.Collapsed then tS else (tS + 1 + cS))
 
-                        local TargetSize = UDim2.new(1, 0, 0, if Groupbox.Collapsed then 34 else (GroupboxList.AbsoluteContentSize.Y / Library.DPIScale) + 49)
-
-                        GroupboxLine.Visible = not Groupbox.Collapsed
+                        gc.Size = UDim2.new(1, 0, 0, cS)
+                        gln.Visible = not gbox.Collapsed
                         if Library.Animations and Library.Animations.Groupbox then
-                            local TweenInfo = Library.GroupboxTweenInfo or TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                            local Tween = TweenService:Create(GroupboxHolder, TweenInfo, { Size = TargetSize })
-                            ResizeTween = Tween
-
-                            local Connection; Connection = Library:GiveSignal(Tween.Completed:Once(function()
-                                if Connection then
-                                    Connection:Disconnect()
-                                end
-
-                                if ResizeTween == Tween then
-                                    StopTween(ResizeTween, true)
-                                    ResizeTween = nil
-                                end
+                            local ti = Library.GroupboxTweenInfo or TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                            local tw = TweenService:Create(gh, ti, { Size = tgS })
+                            rzT = tw
+                            local conn; conn = Library:GiveSignal(tw.Completed:Once(function()
+                                if conn then conn:Disconnect() end
+                                if rzT == tw then StopTween(rzT, true) rzT = nil end
                             end))
-
-                            Tween:Play()
+                            tw:Play()
                         else
-                            GroupboxHolder.Size = TargetSize
+                            gh.Size = tgS
                         end
                     end
 
-                    function Groupbox:SetCollapsed(Collapsed: boolean)
-                        if Info.DisableCollapsing == true then return end
-                        Groupbox.Collapsed = Collapsed
+                    function gbox:SetDescription(desc)
+                        gd.Text = desc or ""
+                        gd.Visible = (desc ~= nil)
+                        gbox:Resize()
+                    end
 
-                        if CollapseArrowTween then
-                            StopTween(CollapseArrowTween, true)
-                            CollapseArrowTween = nil
-                        end
+                    function gbox:SetCollapsed(col)
+                        if i.DisableCollapsing == true then return end
+                        gbox.Collapsed = col
+                        if caT then StopTween(caT, true) caT = nil end
+                        local rot = col and 0 or 180
+                        gc.Visible = not col
 
-                        local TargetRotation = if Collapsed then 0 else 180
-
-                        GroupboxContainer.Visible = not Collapsed
                         if Library.Animations and Library.Animations.Groupbox then
-                            local TweenInfo = Library.GroupboxTweenInfo or TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-                            local Tween = TweenService:Create(GroupboxCollapseArrow, TweenInfo, { Rotation = TargetRotation })
-                            CollapseArrowTween = Tween
-
-                            local Connection; Connection = Library:GiveSignal(Tween.Completed:Connect(function()
-                                if Connection then
-                                    Connection:Disconnect()
-                                end
-
-                                if CollapseArrowTween == Tween then
-                                    StopTween(CollapseArrowTween, true)
-                                    CollapseArrowTween = nil
-                                end
+                            local ti = Library.GroupboxTweenInfo or TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                            local tw = TweenService:Create(gca, ti, { Rotation = rot })
+                            caT = tw
+                            local conn; conn = Library:GiveSignal(tw.Completed:Connect(function()
+                                if conn then conn:Disconnect() end
+                                if caT == tw then StopTween(caT, true) caT = nil end
                             end))
-
-                            Tween:Play()
-                        else
-                            GroupboxCollapseArrow.Rotation = TargetRotation
+                            tw:Play()
+                        elseif gca then
+                            gca.Rotation = rot
                         end
-
-                        Groupbox:Resize()
+                        gbox:Resize()
                     end
 
-                    function Groupbox:ToggleCollapsed()
-                        if Info.DisableCollapsing == true then return end
-                        Groupbox:SetCollapsed(not Groupbox.Collapsed)
+                    function gbox:ToggleCollapsed()
+                        if i.DisableCollapsing == true then return end
+                        gbox:SetCollapsed(not gbox.Collapsed)
                     end
 
-                    function Groupbox:Destroy()
-                        Groupbox.Destroyed = true
-
-                        if ResizeTween then
-                            StopTween(ResizeTween, true)
-                            ResizeTween = nil
+                    function gbox:Destroy()
+                        gbox.Destroyed = true
+                        if rzT then StopTween(rzT, true) rzT = nil end
+                        if caT then StopTween(caT, true) caT = nil end
+                        if gbox.Connections then
+                            for _, cn in gbox.Connections do cn:Disconnect() end
                         end
-
-                        if CollapseArrowTween then
-                            StopTween(CollapseArrowTween, true)
-                            CollapseArrowTween = nil
+                        for _, el in gbox.Elements do
+                            if el.Destroy then el:Destroy() end
                         end
-
-                        if Groupbox.Connections then
-                            for _, Connection in Groupbox.Connections do
-                                Connection:Disconnect()
-                            end
+                        table.clear(gbox.Elements)
+                        for _, sdb in gbox.DependencyBoxes do
+                            if sdb.Destroy then sdb:Destroy() end
                         end
-
-                        for _, Element in Groupbox.Elements do
-                            if Element.Destroy then
-                                Element:Destroy()
-                            end
-                        end
-                        table.clear(Groupbox.Elements)
-
-                        for _, SubDepbox in Groupbox.DependencyBoxes do
-                            if SubDepbox.Destroy then
-                                SubDepbox:Destroy()
-                            end
-                        end
-                        table.clear(Groupbox.DependencyBoxes)
-
-                        if GroupboxHolder then 
-                            GroupboxHolder:Destroy() 
-                        end
-
-                        if BoxHolder then
-                            BoxHolder:Destroy()
-                        end
+                        table.clear(gbox.DependencyBoxes)
+                        if gh then gh:Destroy() end
+                        if bh then bh:Destroy() end
                     end
 
-                    function Groupbox:SetVisible(Visible: boolean)
-                        Groupbox.Visible = Visible
-                        BoxHolder.Visible = Visible
-
-                        if Visible == true and Library.Searching then
+                    function gbox:SetVisible(vis)
+                        gbox.Visible = vis
+                        bh.Visible = vis
+                        if vis == true and Library.Searching then
                             Library:UpdateSearch(Library.SearchText)
                         end
                     end
 
-                    function Groupbox:Show()
-                        Groupbox:SetVisible(true) 
-                    end
+                    function gbox:Show() gbox:SetVisible(true) end
+                    function gbox:Hide() gbox:SetVisible(false) end
 
-                    function Groupbox:Hide()
-                        Groupbox:SetVisible(false) 
-                    end
-
-                    if Info.DisableCollapsing ~= true then
-                        GroupboxCollapseArrow.MouseButton1Click:Connect(function()
-                            Groupbox:ToggleCollapsed()
+                    if gca then
+                        gca.MouseButton1Click:Connect(function()
+                            gbox:ToggleCollapsed()
                         end)
                     end
 
-                    Groupbox.AddTabbox = AddTabbox
-                    setmetatable(Groupbox, BaseGroupbox)
+                    gbox.AddTabbox = AddTabbox
+                    setmetatable(gbox, BaseGroupbox)
 
-                    Groupbox:Resize()
-                    Tab.Groupboxes[Info.Name] = Groupbox
+                    gbox:Resize()
+                    Tab.Groupboxes[i.Name] = gbox
 
-                    if Info.Visible == false then
-                        Groupbox:Hide()
-                    end
+                    if i.Visible == false then gbox:Hide() end
+                    if i.DisableCollapsing ~= true and i.Collapsed == true then gbox:SetCollapsed(true) end
 
-                    if Info.DisableCollapsing ~= true and Info.Collapsed == true then
-                        Groupbox:SetCollapsed(true)
-                    end
-
-                    return Groupbox
+                    return gbox
                 end
 
                 function Tab:AddLeftGroupbox(Name, IconName, Visible, Collapsed, DisableCollapsing)
@@ -15179,6 +15133,7 @@ function Library:CreateLoading(LoadingInfo)
     })
     ParentUI(ScreenGui)
     Loading.ScreenGui = ScreenGui
+    SetAlwaysOnTop(ScreenGui, LoadingInfo.AlwaysOnTop)
 
     ScreenGui.DescendantRemoving:Connect(function(Instance)
         Library:RemoveFromRegistry(Instance)
