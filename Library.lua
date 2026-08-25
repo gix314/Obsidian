@@ -7085,9 +7085,10 @@ do
         local db = New("TextButton", {
             Active = not o.Disabled,
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 21),
+            Size = UDim2.new(1, d.Expandable ~= false and -38 or -20, 0, 21),
             Text = "---",
             TextSize = 14,
+            TextTruncate = Enum.TextTruncate.AtEnd,
             TextXAlignment = Enum.TextXAlignment.Left,
             ZIndex = 2,
             Parent = dc,
@@ -7231,7 +7232,6 @@ do
                 if s ~= "" and d.FormatDisplayValue then s = tostring(d.FormatDisplayValue(s)) end
             end
 
-            if #s > 25 then s = s:sub(1, 22) .. "..." end
             db.Text = (s == "" and "---" or s)
 
             if img then
@@ -7244,8 +7244,11 @@ do
                 di.ImageTransparency = 1
             end
 
-            db.Size = img and UDim2.new(1, -8, 0, 21) or UDim2.new(1, 0, 0, 21)
-            db.Position = img and UDim2.fromOffset(14, 0) or UDim2.fromOffset(0, 0)
+            local rOff = d.Expandable ~= false and -38 or -20
+            local lOff = img and 18 or 0
+
+            db.Position = UDim2.fromOffset(lOff, 0)
+            db.Size = UDim2.new(1, rOff - lOff, 1, 0)
         end
 
         function o:OnChanged(fn) o.Changed = fn end
