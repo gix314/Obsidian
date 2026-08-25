@@ -2960,6 +2960,12 @@ function Library:AddContextMenu(
         Parent = Menu,
     })
 
+    if List == 1 then
+        Table.List = New("UIListLayout", {
+            Parent = Menu,
+        })
+    end
+
     local Corner;
     if IgnoreCornerRadius ~= true then
         if SpecificCornersOnly == "top" then
@@ -7184,7 +7190,7 @@ do
 
         local mt = Library:AddContextMenu(
             dc,
-            function() return UDim2.fromOffset(dc.AbsoluteSize.X / Library.DPIScale, 0) end,
+            function() return UDim2.fromOffset(dc.AbsoluteSize.X / (Library.DPIScale or 1), 0) end,
             function() return { 0.5, dc.AbsoluteSize.Y + 1.5 } end,
             2,
             function(act)
@@ -7213,7 +7219,7 @@ do
             local n = cnt or #fE
             local y = math.clamp(n * rH, 0, (d.MaxVisibleDropdownItems or 8) * rH)
             mt.Menu.CanvasSize = UDim2.fromOffset(0, n * rH)
-            mt:SetSize(function() return UDim2.fromOffset(dc.AbsoluteSize.X / Library.DPIScale, y) end)
+            mt:SetSize(function() return UDim2.fromOffset(dc.AbsoluteSize.X / (Library.DPIScale or 1), y) end)
         end
 
         function o:UpdateColors()
@@ -7321,8 +7327,9 @@ do
         local function gFVI()
             local tot = #fE
             if tot <= pS then return 1 end
-            local scY = mt.Menu.CanvasPosition.Y
-            return math.clamp(math.floor(scY / rH) + 1, 1, math.max(1, tot - pS + 1))
+            local scY = mt.Menu.CanvasPosition.Y / (Library.DPIScale or 1)
+            local idx = math.floor(scY / rH) + 1
+            return math.clamp(idx, 1, math.max(1, tot - pS + 1))
         end
 
         function o:RefreshPool()
