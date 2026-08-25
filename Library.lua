@@ -2926,7 +2926,7 @@ function Library:AddContextMenu(
 
     if List then
         Menu = New("ScrollingFrame", {
-            AutomaticCanvasSize = List == 2 and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
+            AutomaticCanvasSize = Enum.AutomaticSize.None,
             AutomaticSize = List == 1 and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
             BackgroundColor3 = "BackgroundColor",
             BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
@@ -7121,7 +7121,7 @@ do
             Parent = dc,
         })
 
-        local eb
+        local eb, ei
         if d.Expandable ~= false then
             local xi = Library:GetIcon("maximize-2")
             eb = New("TextButton", {
@@ -7133,7 +7133,7 @@ do
                 ZIndex = 3,
                 Parent = dc,
             })
-            local ei = New("ImageLabel", {
+            ei = New("ImageLabel", {
                 Image = xi and xi.Url or "",
                 ImageColor3 = "FontColor",
                 ImageRectOffset = xi and xi.ImageRectOffset or Vector2.zero,
@@ -7205,13 +7205,13 @@ do
         o.Menu = mt
 
         local rH = 21
-        local pS = math.max(1, d.MaxVisibleDropdownItems + 2)
+        local pS = math.max(1, (d.MaxVisibleDropdownItems or 8) + 4)
         local pool = {}
         local fE = {}
 
         function o:RecalculateListSize(cnt)
             local n = cnt or #fE
-            local y = math.clamp(n * rH, 0, d.MaxVisibleDropdownItems * rH)
+            local y = math.clamp(n * rH, 0, (d.MaxVisibleDropdownItems or 8) * rH)
             mt.Menu.CanvasSize = UDim2.fromOffset(0, n * rH)
             mt:SetSize(function() return UDim2.fromOffset(dc.AbsoluteSize.X / Library.DPIScale, y) end)
         end
@@ -7284,7 +7284,7 @@ do
 
         local function rFE()
             local vs = o.Values
-            local dis = o.DisabledValues
+            local dis = o.DisabledValues or {}
             local isD = not IsSequentialArray(vs)
             local eL, dL = {}, {}
             local pnd = {}
@@ -7292,7 +7292,7 @@ do
             for k, rv in vs do
                 local v = isD and k or rv
                 local fv = tostring(d.FormatListValue and d.FormatListValue(rv) or rv)
-                if not sb or fv:lower():find(sb.Text:lower(), 1, true) then
+                if not sb or sb.Text == "" or fv:lower():find(sb.Text:lower(), 1, true) then
                     local isDis = table.find(dis, v) ~= nil or (rv ~= nil and rv ~= v and table.find(dis, rv) ~= nil)
                     table.insert(pnd, {
                         Value = v,
@@ -7321,8 +7321,8 @@ do
         local function gFVI()
             local tot = #fE
             if tot <= pS then return 1 end
-            local scY = mt.Menu.CanvasPosition.Y / Library.DPIScale
-            return math.clamp(math.floor(scY / rH) + 1, 1, tot - pS + 1)
+            local scY = mt.Menu.CanvasPosition.Y
+            return math.clamp(math.floor(scY / rH) + 1, 1, math.max(1, tot - pS + 1))
         end
 
         function o:RefreshPool()
@@ -7393,7 +7393,7 @@ do
         end
 
         local function aDR(from, to, inR)
-            for i = from, to do aDI(i, inR) end
+            for idx = from, to do aDI(idx, inR) end
         end
 
         local function uD(cur)
@@ -7563,6 +7563,324 @@ do
             o:RefreshPool()
         end))
 
+        local expO, expF, expSc, expL, expG, expSB, expEL
+        local expBtns = {}
+        local rExpL
+
+        local function isValSel(v)
+            if d.Multi then return o.Value[v] == true end
+            return o.Value == v
+        end
+
+        local function refAllBtns()
+            for _, r in pool do r:UpdateButton() end
+            for _, tb in expBtns do tb:UpdateButton() end
+        end
+
+        local function togVal(v)
+            local try = not isValSel(v)
+            if not (o:GetActiveValues(true) == 1 and not try and not d.AllowNull) then
+                if d.Multi then
+                    o.Value[v] = try and true or nil
+                else
+                    o.Value = try and v or nil
+                end
+            end
+            refAllBtns()
+            o:Display()
+            Library:UpdateDependencyBoxes()
+            o:RunChanged()
+        end
+
+        local function bExpP()
+            if expO then return end
+            local par = Library.MainFrame
+            if not par then return end
+
+            expO = New("TextButton", {
+                AutoButtonColor = false,
+                BackgroundColor3 = "DarkColor",
+                BackgroundTransparency = 1,
+                Size = UDim2.fromScale(1, 1),
+                Text = "",
+                Visible = false,
+                ZIndex = 8000,
+                Parent = par,
+            })
+            table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = expO }))
+
+            expF = New("TextButton", {
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                AutoButtonColor = false,
+                BackgroundColor3 = "BackgroundColor",
+                Position = UDim2.fromScale(0.5, 0.5),
+                Size = UDim2.new(0.7, 0, 0.72, 0),
+                Text = "",
+                ZIndex = 8001,
+                Parent = expO,
+            })
+            table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = expF }))
+            Library:AddOutline(expF)
+
+            expSc = New("UIScale", { Scale = 1, Parent = expF })
+
+            local hdr = New("Frame", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, 34),
+                Parent = expF,
+            })
+            Library:MakeLine(hdr, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 1) })
+
+            New("TextLabel", {
+                BackgroundTransparency = 1,
+                Position = UDim2.fromOffset(12, 0),
+                Size = UDim2.new(1, -56, 1, 0),
+                Text = o.Text or "Select a value",
+                TextSize = 15,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = hdr,
+            })
+
+            local ci = Library:GetIcon("x")
+            local cb = New("TextButton", {
+                AnchorPoint = Vector2.new(1, 0.5),
+                BackgroundColor3 = "MainColor",
+                BackgroundTransparency = 1,
+                Position = UDim2.new(1, -8, 0.5, 0),
+                Size = UDim2.fromOffset(22, 22),
+                Text = "",
+                Parent = hdr,
+            })
+            table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius / 2), Parent = cb }))
+            New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = cb })
+            New("ImageLabel", {
+                Image = ci and ci.Url or "",
+                ImageColor3 = "FontColor",
+                ImageRectOffset = ci and ci.ImageRectOffset or Vector2.zero,
+                ImageRectSize = ci and ci.ImageRectSize or Vector2.zero,
+                ImageTransparency = 0.4,
+                ScaleType = Enum.ScaleType.Fit,
+                Size = UDim2.fromScale(1, 1),
+                Parent = cb,
+            })
+
+            cb.MouseEnter:Connect(function() TweenService:Create(cb, Library.TweenInfo, { BackgroundTransparency = 0 }):Play() end)
+            cb.MouseLeave:Connect(function() TweenService:Create(cb, Library.TweenInfo, { BackgroundTransparency = 1 }):Play() end)
+            cb.MouseButton1Click:Connect(function() o:Collapse() end)
+
+            local lTop = 34
+            if d.Searchable then
+                lTop = 34 + 38
+                expSB = New("TextBox", {
+                    BackgroundColor3 = "MainColor",
+                    PlaceholderText = "Search...",
+                    Position = UDim2.fromOffset(10, 42),
+                    Size = UDim2.new(1, -20, 0, 26),
+                    Text = "",
+                    TextSize = 14,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = expF,
+                })
+                table.insert(Library.PillCorners, New("UICorner", { CornerRadius = Library.CornerRadius > 0 and UDim.new(1, 0) or UDim.new(0, 0), Parent = expSB }))
+                New("UIPadding", { PaddingLeft = UDim.new(0, 32), PaddingRight = UDim.new(0, 12), Parent = expSB })
+                New("UIStroke", { Color = "OutlineColor", Parent = expSB })
+
+                local si = Library:GetIcon("search")
+                New("ImageLabel", {
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Image = si and si.Url or "",
+                    ImageColor3 = "FontColor",
+                    ImageRectOffset = si and si.ImageRectOffset or Vector2.zero,
+                    ImageRectSize = si and si.ImageRectSize or Vector2.zero,
+                    ImageTransparency = 0.4,
+                    Position = UDim2.new(0, -22, 0.5, 0),
+                    ScaleType = Enum.ScaleType.Fit,
+                    Size = UDim2.fromOffset(15, 15),
+                    Parent = expSB,
+                })
+
+                table.insert(o.Connections, expSB:GetPropertyChangedSignal("Text"):Connect(function() rExpL() end))
+            end
+
+            expL = New("ScrollingFrame", {
+                AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                BackgroundTransparency = 1,
+                CanvasSize = UDim2.fromScale(0, 0),
+                Position = UDim2.fromOffset(0, lTop),
+                ScrollBarImageColor3 = "OutlineColor",
+                ScrollBarThickness = 2,
+                Size = UDim2.new(1, 0, 1, -lTop),
+                Parent = expF,
+            })
+            expG = New("UIGridLayout", {
+                CellPadding = UDim2.fromOffset(6, 6),
+                SortOrder = Enum.SortOrder.LayoutOrder,
+                Parent = expL,
+            })
+            New("UIPadding", { PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingTop = UDim.new(0, 10), Parent = expL })
+
+            expEL = New("TextLabel", {
+                BackgroundTransparency = 1,
+                Position = UDim2.fromOffset(0, lTop + 14),
+                Size = UDim2.new(1, 0, 0, 16),
+                Text = "No matching values",
+                TextSize = 14,
+                TextTransparency = 0.5,
+                Visible = false,
+                Parent = expF,
+            })
+
+            expO.MouseButton1Click:Connect(function() o:Collapse() end)
+        end
+
+        function rExpL()
+            if not expL then return end
+            for btn in expBtns do
+                if btn and btn.Parent then btn.Parent:Destroy() end
+            end
+            table.clear(expBtns)
+
+            local cols = math.max(1, d.ExpandColumns or 2)
+            local srch = expSB and expSB.Text:lower() or ""
+            local cnt = 0
+            local isD = not IsSequentialArray(o.Values)
+
+            for k, rv in o.Values do
+                local v = isD and k or rv
+                local fmt = tostring(d.FormatListValue and d.FormatListValue(rv) or rv)
+                if srch ~= "" and not fmt:lower():find(srch, 1, true) then continue end
+
+                cnt += 1
+                local dis = table.find(o.DisabledValues or {}, v) ~= nil
+                local vi = gVI(v, rv)
+                local tbl = {}
+
+                local item = New("Frame", {
+                    BackgroundColor3 = "MainColor",
+                    BackgroundTransparency = 1,
+                    LayoutOrder = dis and 1 or 0,
+                    Parent = expL,
+                })
+                table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius / 2), Parent = item }))
+                local stroke = New("UIStroke", { Color = "OutlineColor", Transparency = 0.5, Parent = item })
+
+                local img = vi and New("ImageLabel", {
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    BackgroundTransparency = 1,
+                    Image = vi.Url,
+                    ImageRectOffset = vi.ImageRectOffset or Vector2.zero,
+                    ImageRectSize = vi.ImageRectSize or Vector2.zero,
+                    ImageTransparency = 0.5,
+                    Position = UDim2.new(0, 8, 0.5, 0),
+                    Size = UDim2.fromOffset(18, 18),
+                    Parent = item,
+                })
+
+                local btn = New("TextButton", {
+                    BackgroundTransparency = 1,
+                    Position = vi and UDim2.fromOffset(30, 0) or UDim2.fromOffset(0, 0),
+                    Size = vi and UDim2.new(1, -30, 1, 0) or UDim2.fromScale(1, 1),
+                    Text = fmt,
+                    TextSize = 14,
+                    TextTransparency = 0.5,
+                    TextTruncate = Enum.TextTruncate.AtEnd,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = item,
+                })
+                New("UIPadding", { PaddingLeft = UDim.new(0, vi and 0 or 10), PaddingRight = UDim.new(0, 10), Parent = btn })
+
+                function tbl:UpdateButton()
+                    local sel = isValSel(v)
+                    item.BackgroundTransparency = sel and 0 or 1
+                    stroke.Transparency = sel and 0.2 or 0.7
+                    btn.TextTransparency = dis and 0.8 or sel and 0 or 0.4
+                    if img then img.ImageTransparency = dis and 0.8 or sel and 0 or 0.4 end
+                end
+
+                tbl.Value = v
+
+                if not dis then
+                    btn.MouseEnter:Connect(function()
+                        if isValSel(v) then return end
+                        TweenService:Create(item, Library.TweenInfo, { BackgroundTransparency = 0.5 }):Play()
+                    end)
+                    btn.MouseLeave:Connect(function()
+                        if isValSel(v) then return end
+                        TweenService:Create(item, Library.TweenInfo, { BackgroundTransparency = 1 }):Play()
+                    end)
+                    btn.MouseButton1Click:Connect(function()
+                        togVal(v)
+                        if not d.Multi then o:Collapse() end
+                    end)
+                end
+
+                tbl:UpdateButton()
+                expBtns[btn] = tbl
+            end
+
+            expG.CellSize = UDim2.new(1 / cols, -6 * (cols - 1) / cols, 0, 28)
+            expEL.Visible = cnt == 0
+        end
+
+        local expanded = false
+        local expFade, expScTw
+
+        local function sExpT()
+            if expFade then StopTween(expFade, true) expFade = nil end
+            if expScTw then StopTween(expScTw, true) expScTw = nil end
+        end
+
+        function o:Expand()
+            if o.Disabled or d.Expandable == false or expanded then return end
+            bExpP()
+            if not expO then return end
+            if Library.ActiveExpandedDropdown and Library.ActiveExpandedDropdown ~= o then
+                Library.ActiveExpandedDropdown:Collapse()
+            end
+
+            mt:Close()
+            if expSB then expSB.Text = "" end
+            expanded = true
+            Library.ActiveExpandedDropdown = o
+            rExpL()
+            sExpT()
+
+            expO.BackgroundTransparency = 1
+            expSc.Scale = 0.94
+            expO.Visible = true
+
+            expFade = TweenService:Create(expO, DROPDOWN_EXPAND_TWEEN, { BackgroundTransparency = 0.5 })
+            expScTw = TweenService:Create(expSc, DROPDOWN_EXPAND_TWEEN, { Scale = 1 })
+            expFade:Play()
+            expScTw:Play()
+        end
+
+        function o:Collapse()
+            if not expanded or not expO then return end
+            expanded = false
+            if Library.ActiveExpandedDropdown == o then
+                Library.ActiveExpandedDropdown = nil
+            end
+            sExpT()
+
+            expFade = TweenService:Create(expO, DROPDOWN_EXPAND_TWEEN, { BackgroundTransparency = 1 })
+            expScTw = TweenService:Create(expSc, DROPDOWN_EXPAND_TWEEN, { Scale = 0.96 })
+
+            expFade.Completed:Once(function(st)
+                if st == Enum.PlaybackState.Cancelled or expanded then return end
+                expO.Visible = false
+            end)
+            expFade:Play()
+            expScTw:Play()
+        end
+
+        function o:IsExpanded() return expanded end
+
+        function o:ToggleExpanded()
+            if o:IsExpanded() then o:Collapse() else o:Expand() end
+        end
+
         function o:SetValue(val)
             if d.Multi then
                 local t = {}
@@ -7583,7 +7901,7 @@ do
             end
 
             o:Display()
-            for _, r in pool do r:UpdateButton() end
+            refAllBtns()
 
             if not o.Disabled then
                 Library:UpdateDependencyBoxes()
@@ -7604,7 +7922,9 @@ do
             end
 
             o:BuildDropdownList()
+            if expanded then rExpL() end
             o:Display()
+
             if chg and not o.Disabled then
                 Library:UpdateDependencyBoxes()
                 o:RunChanged()
@@ -7630,11 +7950,13 @@ do
                 end
             end
             o:BuildDropdownList()
+            if expanded then rExpL() end
         end
 
         function o:SetDisabledValues(dis)
             o.DisabledValues = dis
             o:BuildDropdownList()
+            if expanded then rExpL() end
         end
 
         function o:AddDisabledValues(dis)
@@ -7646,24 +7968,28 @@ do
                 return
             end
             o:BuildDropdownList()
+            if expanded then rExpL() end
         end
 
         function o:SetValueImages(vi)
             if typeof(vi) ~= "table" then return end
             o.ValueImages = vi
             o:BuildDropdownList()
+            if expanded then rExpL() end
         end
 
         function o:AddValueImages(vi)
             if typeof(vi) ~= "table" then return end
             for k, v in vi do o.ValueImages[k] = v end
             o:BuildDropdownList()
+            if expanded then rExpL() end
         end
 
         function o:SetDisabled(dis)
             o.Disabled = dis
             if o.TooltipTable then o.TooltipTable.Disabled = o.Disabled end
             mt:Close()
+            o:Collapse()
             db.Active = not o.Disabled
             o:UpdateColors()
         end
@@ -7754,11 +8080,13 @@ do
         function o:Destroy()
             o.Destroyed = true
             sDS()
+            o:Collapse()
             if o.Connections then
                 for _, cn in o.Connections do cn:Disconnect() end
             end
             if o.TooltipTable then o.TooltipTable:Destroy() end
             if mt then mt:Destroy() end
+            if expO then expO:Destroy() end
             if h then h:Destroy() end
             local eIdx = table.find(g.Elements, o)
             if eIdx then table.remove(g.Elements, eIdx) end
