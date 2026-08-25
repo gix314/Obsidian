@@ -558,6 +558,15 @@ local Templates = {
         Disabled = false,
         Visible = true,
     },
+    PriorityList = {
+        Text = "Priority List",
+        Values = {},
+        Default = {},
+        Callback = function() end,
+        Changed = function() end,
+        Disabled = false,
+        Visible = true,
+    },
     Viewport = {
         Object = nil,
         Camera = nil,
@@ -8178,6 +8187,433 @@ do
         Options[Idx] = List
         return List
     end
+
+    local function normList(src, opts)
+        local res = {}
+        local seen = {}
+        if typeof(src) == "table" then
+            for _, v in src do
+                local s = tostring(v)
+                if not seen[s] then
+                    seen[s] = true
+                    table.insert(res, s)
+                end
+            end
+        end
+        if typeof(opts) == "table" then
+            for _, v in opts do
+                local s = tostring(v)
+                if not seen[s] then
+                    seen[s] = true
+                    table.insert(res, s)
+                end
+            end
+        end
+        return res
+    end
+
+    function Funcs:AddPriorityList(i, d)
+        if self.Destroyed then return nil end
+        d = Library:Validate(d, Templates.PriorityList)
+        local g = self
+        local c = g.Container
+
+        local o = {
+            Connections = {},
+            Destroyed = false,
+            Text = d.Text,
+            Values = d.Values or {},
+            Value = normList(d.Default, d.Values),
+            Tooltip = d.Tooltip,
+            DisabledTooltip = d.DisabledTooltip,
+            TooltipTable = nil,
+            Callback = d.Callback,
+            Changed = d.Changed,
+            Disabled = d.Disabled,
+            Visible = d.Visible,
+            Type = "PriorityList",
+        }
+
+        local h = New("Frame", {
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, 0, 0, 0),
+            Visible = o.Visible,
+            Parent = c,
+        })
+        New("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder, Parent = h })
+
+        local l = New("TextLabel", {
+            BackgroundTransparency = 1,
+            LayoutOrder = 1,
+            Size = UDim2.new(1, 0, 0, 14),
+            Text = o.Text,
+            TextSize = 14,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Visible = not not d.Text,
+            Parent = h,
+        })
+
+        local hb = New("TextButton", {
+            BackgroundColor3 = "MainColor",
+            LayoutOrder = 2,
+            Size = UDim2.new(1, 0, 0, 24),
+            Text = "",
+            Parent = h,
+        })
+        table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius / 2), Parent = hb }))
+        New("UIStroke", { Color = "OutlineColor", Parent = hb })
+        New("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 24), Parent = hb })
+
+        local ht = New("TextLabel", {
+            BackgroundTransparency = 1,
+            Size = UDim2.fromScale(1, 1),
+            Text = "",
+            TextSize = 13,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = hb,
+        })
+
+        local hbx = New("TextBox", {
+            BackgroundTransparency = 1,
+            ClearTextOnFocus = false,
+            PlaceholderText = "Search...",
+            Size = UDim2.fromScale(1, 1),
+            Text = "",
+            TextSize = 13,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Visible = false,
+            Parent = hb,
+        })
+
+        local ai = New("ImageLabel", {
+            AnchorPoint = Vector2.new(1, 0.5),
+            BackgroundTransparency = 1,
+            Image = ArrowIcon and ArrowIcon.Url or "",
+            ImageColor3 = "FontColor",
+            ImageRectOffset = ArrowIcon and ArrowIcon.ImageRectOffset or Vector2.zero,
+            ImageRectSize = ArrowIcon and ArrowIcon.ImageRectSize or Vector2.zero,
+            ImageTransparency = 0.5,
+            Position = UDim2.new(1, 18, 0.5, 0),
+            Size = UDim2.fromOffset(16, 16),
+            Parent = hb,
+        })
+
+        local lf = New("Frame", {
+            BackgroundColor3 = "BackgroundColor",
+            ClipsDescendants = true,
+            LayoutOrder = 3,
+            Size = UDim2.new(1, 0, 0, 0),
+            Visible = false,
+            Parent = h,
+        })
+        table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius / 2), Parent = lf }))
+        New("UIStroke", { Color = "OutlineColor", Parent = lf })
+        local lfp = New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = lf })
+
+        local cards = {}
+        local open = false
+        local openTw = nil
+        local cStride = 30
+        local isDrag = false
+        local dCard = nil
+        local dIdx = 1
+        local dStY = 0
+        local dCardStY = 0
+
+        local function uSummary()
+            local list = o.Value or {}
+            ht.Text = #list > 0 and table.concat(list, " > ") or "None"
+        end
+
+        local function gFullH()
+            local vCnt = 0
+            for _, c in cards do
+                if c.f.Visible then vCnt += 1 end
+            end
+            return vCnt * cStride + 8
+        end
+
+        local function twH(tgH, onDone)
+            if openTw then StopTween(openTw, true) openTw = nil end
+            openTw = TweenService:Create(lf, Library.TweenInfo, { Size = UDim2.new(1, 0, 0, tgH) })
+            if onDone then
+                local c; c = openTw.Completed:Once(function()
+                    if c then c:Disconnect() end
+                    onDone()
+                end)
+            end
+            openTw:Play()
+            task.defer(function() g:Resize() end)
+        end
+
+        local function setOpen(st)
+            if o.Disabled then return end
+            open = st
+            ai.Rotation = open and 180 or 0
+            ai.ImageTransparency = open and 0 or 0.5
+            if open then
+                lf.Size = UDim2.new(1, 0, 0, 0)
+                lf.Visible = true
+                ht.Visible = false
+                hbx.Visible = true
+                hbx.Text = ""
+                twH(gFullH())
+            else
+                twH(0, function()
+                    lf.Visible = false
+                    ht.Visible = true
+                    hbx.Visible = false
+                end)
+            end
+        end
+
+        local function uCardLbl(idx)
+            local itm = cards[idx]
+            if not itm then return end
+            itm.l.Text = string.format("<b>%d.</b> %s", idx, itm.name)
+            itm.tb.Text = tostring(idx)
+        end
+
+        local function swap(oI, nI)
+            if oI == nI or oI < 1 or oI > #o.Value or nI < 1 or nI > #o.Value then return end
+            local c1 = cards[oI]
+            local c2 = cards[nI]
+            if not c1 or not c2 then return end
+
+            local tv = o.Value[oI]
+            o.Value[oI] = o.Value[nI]
+            o.Value[nI] = tv
+
+            cards[oI] = c2
+            cards[nI] = c1
+
+            uCardLbl(oI)
+            uCardLbl(nI)
+            uSummary()
+
+            TweenService:Create(c1.f, Library.TweenInfo, { Position = UDim2.fromOffset(0, (nI - 1) * cStride) }):Play()
+            TweenService:Create(c2.f, Library.TweenInfo, { Position = UDim2.fromOffset(0, (oI - 1) * cStride) }):Play()
+
+            Library:SafeCallback(o.Callback, o.Value)
+            Library:SafeCallback(o.Changed, o.Value)
+        end
+
+        local function rebuildCards()
+            for _, itm in cards do itm.f:Destroy() end
+            table.clear(cards)
+
+            for idx, val in ipairs(o.Value) do
+                local cf = New("Frame", {
+                    BackgroundColor3 = "MainColor",
+                    Position = UDim2.fromOffset(0, (idx - 1) * cStride),
+                    Size = UDim2.new(1, 0, 0, 26),
+                    ZIndex = 2,
+                    Parent = lf,
+                })
+                table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius / 2), Parent = cf }))
+                local cfs = New("UIStroke", { Color = "OutlineColor", Parent = cf })
+
+                local cl = New("TextLabel", {
+                    BackgroundTransparency = 1,
+                    Position = UDim2.fromOffset(8, 0),
+                    Size = UDim2.new(1, -52, 1, 0),
+                    Text = string.format("<b>%d.</b> %s", idx, tostring(val)),
+                    TextSize = 13,
+                    TextTruncate = Enum.TextTruncate.AtEnd,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    ZIndex = 3,
+                    Parent = cf,
+                })
+
+                local tbw = New("Frame", {
+                    AnchorPoint = Vector2.new(1, 0.5),
+                    BackgroundColor3 = "BackgroundColor",
+                    Position = UDim2.new(1, -4, 0.5, 0),
+                    Size = UDim2.fromOffset(36, 18),
+                    ZIndex = 3,
+                    Parent = cf,
+                })
+                table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius / 2), Parent = tbw }))
+                New("UIStroke", { Color = "OutlineColor", Parent = tbw })
+
+                local tb = New("TextBox", {
+                    BackgroundTransparency = 1,
+                    ClearTextOnFocus = false,
+                    Size = UDim2.fromScale(1, 1),
+                    Text = tostring(idx),
+                    TextSize = 12,
+                    TextXAlignment = Enum.TextXAlignment.Center,
+                    ZIndex = 4,
+                    Parent = tbw,
+                })
+
+                local function gIdx()
+                    for i, itm in ipairs(cards) do
+                        if itm.f == cf then return i end
+                    end
+                    return idx
+                end
+
+                table.insert(o.Connections, tb:GetPropertyChangedSignal("Text"):Connect(function()
+                    local cln = string.gsub(tb.Text, "%D", "")
+                    if cln ~= tb.Text then tb.Text = cln end
+                end))
+
+                table.insert(o.Connections, tb.FocusLost:Connect(function()
+                    local cur = gIdx()
+                    local np = tonumber(tb.Text)
+                    if np and np >= 1 and np <= #o.Value and np ~= cur then
+                        swap(cur, np)
+                    else
+                        tb.Text = tostring(cur)
+                    end
+                end))
+
+                table.insert(o.Connections, cf.InputBegan:Connect(function(inp)
+                    if (inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch) and not isDrag and not tb:IsFocused() then
+                        local cur = gIdx()
+                        isDrag = true
+                        dCard = cf
+                        dIdx = cur
+                        dStY = inp.Position.Y
+                        dCardStY = (cur - 1) * cStride
+                        cf.ZIndex = 25
+                        TweenService:Create(cfs, Library.TweenInfo, { Color = Library.Scheme.AccentColor }):Play()
+
+                        for _, side in Library:GetActiveSides() do side.ScrollingEnabled = false end
+
+                        local endC
+                        endC = UserInputService.InputEnded:Connect(function(eInp)
+                            if eInp.UserInputType == Enum.UserInputType.MouseButton1 or eInp.UserInputType == Enum.UserInputType.Touch then
+                                isDrag = false
+                                endC:Disconnect()
+                                cf.ZIndex = 2
+                                TweenService:Create(cfs, Library.TweenInfo, { Color = Library.Scheme.OutlineColor }):Play()
+
+                                for _, side in Library:GetActiveSides() do side.ScrollingEnabled = true end
+
+                                local cy = cf.Position.Y.Offset
+                                local tg = math.clamp(math.floor((cy + cStride / 2) / cStride) + 1, 1, #o.Value)
+                                if tg ~= dIdx then
+                                    swap(dIdx, tg)
+                                else
+                                    TweenService:Create(cf, Library.TweenInfo, { Position = UDim2.fromOffset(0, (dIdx - 1) * cStride) }):Play()
+                                end
+                                dCard = nil
+                            end
+                        end)
+                    end
+                end))
+
+                table.insert(cards, { f = cf, s = cfs, l = cl, tb = tb, name = tostring(val) })
+            end
+
+            if open then twH(gFullH()) end
+        end
+
+        table.insert(o.Connections, UserInputService.InputChanged:Connect(function(inp)
+            if isDrag and dCard and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+                local dy = inp.Position.Y - dStY
+                local maxB = math.max(0, (#o.Value - 1) * cStride)
+                local clpY = math.clamp(dCardStY + dy, 0, maxB)
+                dCard.Position = UDim2.fromOffset(0, clpY)
+            end
+        end))
+
+        local function flt(q)
+            local lq = string.lower(q or "")
+            local vIdx = 0
+            for _, itm in ipairs(cards) do
+                local m = lq == "" or string.find(string.lower(itm.name), lq, 1, true) ~= nil
+                itm.f.Visible = m
+                if m then
+                    itm.f.Position = UDim2.fromOffset(0, vIdx * cStride)
+                    vIdx += 1
+                end
+            end
+            if open then twH(math.max(vIdx * cStride + 8, 32)) end
+        end
+
+        table.insert(o.Connections, hbx:GetPropertyChangedSignal("Text"):Connect(function() flt(hbx.Text) end))
+        table.insert(o.Connections, hb.MouseButton1Click:Connect(function() setOpen(not open) end))
+
+        function o:SetValue(val)
+            if typeof(val) ~= "table" then return end
+            o.Value = normList(val, o.Values)
+            uSummary()
+            rebuildCards()
+            Library:SafeCallback(o.Callback, o.Value)
+            Library:SafeCallback(o.Changed, o.Value)
+        end
+
+        function o:SetValues(val)
+            if typeof(val) ~= "table" then return end
+            o.Values = val
+            o.Value = normList(o.Value, val)
+            uSummary()
+            rebuildCards()
+            Library:SafeCallback(o.Callback, o.Value)
+            Library:SafeCallback(o.Changed, o.Value)
+        end
+
+        function o:GetValue()
+            return o.Value
+        end
+
+        function o:SetDisabled(dis)
+            o.Disabled = dis
+            if o.TooltipTable then o.TooltipTable.Disabled = o.Disabled end
+            if o.Disabled and open then setOpen(false) end
+            hb.Active = not o.Disabled
+            ht.TextTransparency = o.Disabled and 0.8 or 0
+            l.TextTransparency = o.Disabled and 0.8 or 0
+            ai.ImageTransparency = o.Disabled and 0.8 or (open and 0 or 0.5)
+        end
+
+        function o:SetVisible(vis)
+            o.Visible = vis
+            h.Visible = o.Visible
+            g:Resize()
+        end
+
+        function o:OnChanged(fn)
+            o.Changed = fn
+        end
+
+        if typeof(o.Tooltip) == "string" or typeof(o.DisabledTooltip) == "string" then
+            o.TooltipTable = Library:AddTooltip(o.Tooltip, o.DisabledTooltip, hb)
+            o.TooltipTable.Disabled = o.Disabled
+        end
+
+        uSummary()
+        rebuildCards()
+        g:Resize()
+
+        o.Holder = h
+        table.insert(g.Elements, o)
+        o.Default = d.Default or o.Value
+        Options[i] = o
+
+        function o:Destroy()
+            o.Destroyed = true
+            if openTw then StopTween(openTw, true) openTw = nil end
+            if o.Connections then
+                for _, cn in o.Connections do cn:Disconnect() end
+            end
+            if o.TooltipTable then o.TooltipTable:Destroy() end
+            if h then h:Destroy() end
+            local eIdx = table.find(g.Elements, o)
+            if eIdx then table.remove(g.Elements, eIdx) end
+            g:Resize()
+            Options[i] = nil
+        end
+
+        return o
+    end
+
+    Funcs.AddPriorityDropdown = Funcs.AddPriorityList
 
     function Funcs:AddViewport(Idx, Info)
         if self.Destroyed then return nil end
