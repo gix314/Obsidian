@@ -714,6 +714,16 @@ local function GetTableSize(Table: { [any]: any })
 
     return Size
 end
+
+local function IsSequentialArray(t: { [any]: any })
+    for k in t do
+        if typeof(k) ~= "number" or k < 1 or k % 1 ~= 0 then
+            return false
+        end
+    end
+    return true
+end
+
 local function StopTween(Tween: TweenBase, Destroy: boolean?)
     if not Tween then
         return
