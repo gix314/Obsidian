@@ -63,9 +63,9 @@ local ThemeManager = {
     DefaultThemeName = nil,
 
     BuiltInThemes = {
-    ["Demara"] = {
+    ["Default"] = {
         1,
-        { FontColor = "dce1df", MainColor = "202225", AccentColor = "98c43c", BackgroundColor = "151618", OutlineColor = "35393f" },
+        { FontColor = "f5efea", MainColor = "282020", AccentColor = "e85a3c", BackgroundColor = "1a1414", OutlineColor = "3e3232" },
     },
     ["Starlight"] = {
         2,
@@ -95,9 +95,9 @@ local ThemeManager = {
         8,
         { FontColor = "e6e4eb", MainColor = "2b2a2d", AccentColor = "db4316", BackgroundColor = "1c1b1c", OutlineColor = "48464a" },
     },
-    ["Belobog"] = {
+    ["Demara"] = {
         9,
-        { FontColor = "e7e5ec", MainColor = "252528", AccentColor = "e54714", BackgroundColor = "161618", OutlineColor = "cca33d" },
+        { FontColor = "dce1df", MainColor = "202225", AccentColor = "98c43c", BackgroundColor = "151618", OutlineColor = "35393f" },
     },
     ["Piper"] = {
         10,
@@ -396,7 +396,7 @@ function ThemeManager:SetDefaultTheme(Theme: any)
     assert(not ThemeManager.AppliedToTab, "Cannot set default theme after applying ThemeManager to a tab!")
 
     local Library = ThemeManager.Library
-    local DefaultThemeData = ThemeManager.BuiltInThemes["Wickes"][2]
+    local DefaultThemeData = ThemeManager.BuiltInThemes["Default"][2]
 
     if Theme == nil or Theme == "Default" or Theme == (ThemeManager.BuiltInThemes["Default"] or {}) then
         Theme = DefaultThemeData
@@ -457,7 +457,7 @@ function ThemeManager:SetDefaultTheme(Theme: any)
 
     --// Apply
     Library.Scheme = LibraryScheme
-    ThemeManager.BuiltInThemes["Wickes"] = { 1, FinalTheme }
+    ThemeManager.BuiltInThemes["Default"] = { 1, FinalTheme }
 
     Library:UpdateColorsUsingRegistry()
 end
@@ -492,7 +492,7 @@ function ThemeManager:LoadDefault()
     
     if not Success then
         if FetchErrorMessage == "Default theme is not set" then
-            ThemeName = "Wickes"
+            ThemeName = "Default"
         else
             ThemeManager.Library:Notify(string.format("Failed to apply default theme: %s", FetchErrorMessage))
             return
@@ -555,7 +555,7 @@ function ThemeManager:ApplyTheme(ThemeName: string)
     end
 
     if ThemeName == "Default" then
-        ThemeName = "Wickes"
+        ThemeName = "Default"
     end
 
     local CustomThemeData = ThemeManager:GetCustomTheme(ThemeName)
@@ -709,14 +709,14 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         Multi = false,
 
         FormatDisplayValue = function(Value: any)
-            if Value ~= "Wickes" and Value == ThemeManager.DefaultThemeName then
+            if Value ~= "Default" and Value == ThemeManager.DefaultThemeName then
                 return string.format("%s (default)", Value)
             end
 
             return Value
         end,
         FormatListValue = function(Value: any)
-            if Value ~= "Wickes" and Value == ThemeManager.DefaultThemeName then
+            if Value ~= "Default" and Value == ThemeManager.DefaultThemeName then
                 return string.format("%s (default)", Value)
             end
 
