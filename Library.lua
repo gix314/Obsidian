@@ -10665,10 +10665,10 @@ function Library:CreateWindow(WindowInfo)
         })
 
         RightWrapper = New("Frame", {
-            AnchorPoint = Vector2.new(1, 0.5),
+            AnchorPoint = Vector2.new(0, 0.5),
             BackgroundTransparency = 1,
-            Position = UDim2.new(1, -49 - RightBarInset, 0.5, 0),
-            Size = UDim2.new(1, -InitialLeftWidth - 57 - RightBarInset - 1, 1, -16),
+            Position = UDim2.new(0, InitialLeftWidth + 8, 0.5, 0),
+            Size = UDim2.new(1, -InitialLeftWidth - 8 - 49 - RightBarInset, 1, -16),
             Parent = TopBar,
         })
 
@@ -12002,21 +12002,21 @@ function Library:CreateWindow(WindowInfo)
                 return Tabs.Size.X.Offset
             end
 
-            function Window:SetSidebarWidth(Width)
-                Width = math.clamp(Width, 48, MainFrame.Size.X.Offset - WindowInfo.MinContainerWidth - 1)
+            function Window:SetSidebarWidth(w)
+                w = math.clamp(w, 48, MainFrame.Size.X.Offset - WindowInfo.MinContainerWidth - 1)
 
-                DividerLine.Position = UDim2.fromOffset(Width, 0)
-
-                TitleHolder.Size = UDim2.new(0, Width, 1, 0)
-                RightWrapper.Size = UDim2.new(1, -Width - 57 - 1, 1, -16)
-                Tabs.Size = UDim2.new(0, Width, 1, -70)
-                Container.Size = UDim2.new(1, -Width - 1, 1, -70)
+                DividerLine.Position = UDim2.fromOffset(w, 0)
+                TitleHolder.Size = UDim2.new(0, w, 1, 0)
+                RightWrapper.Position = UDim2.new(0, w + 8, 0.5, 0)
+                RightWrapper.Size = UDim2.new(1, -w - 8 - 49 - RightBarInset, 1, -16)
+                Tabs.Size = UDim2.new(0, w, 1, -70)
+                Container.Size = UDim2.new(1, -w - 1, 1, -70)
 
                 if WindowInfo.EnableCompacting then
                     ApplyCompact()
                 end
                 if not IsCompact then
-                    LastExpandedWidth = Width
+                    LastExpandedWidth = w
                 end
             end
 
