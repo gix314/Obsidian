@@ -12857,6 +12857,22 @@ function Library:CreateWindow(WindowInfo)
                         Parent = TabCanvas,
                     })
 
+                    TabFull = New("ScrollingFrame", {
+                        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                        BackgroundTransparency = 1,
+                        CanvasSize = UDim2.fromScale(0, 0),
+                        ScrollBarImageTransparency = 1,
+                        ScrollBarThickness = 0,
+                        Size = UDim2.new(1, 0, 1, 0),
+                        Parent = TabContainer,
+                    })
+                    New("UIListLayout", { Padding = UDim.new(0, 2), Parent = TabFull })
+                    New("UIPadding", { PaddingBottom = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 2), PaddingTop = UDim.new(0, 2), Parent = TabFull })
+                    do
+                        New("Frame", { BackgroundTransparency = 1, LayoutOrder = -1, Parent = TabFull })
+                        New("Frame", { BackgroundTransparency = 1, LayoutOrder = 1, Parent = TabFull })
+                    end
+
                     TabLeft = New("ScrollingFrame", {
                         AutomaticCanvasSize = Enum.AutomaticSize.Y,
                         BackgroundTransparency = 1,
@@ -13016,15 +13032,14 @@ function Library:CreateWindow(WindowInfo)
                     Type = "Tab",
                     Name = Name,
                     Description = Description,
-
                     Connections = {},
                     Destroyed = false,
-
                     Window = Window,
                     Canvas = TabCanvas,
                     Sides = {
                         TabLeft,
                         TabRight,
+                        TabFull,
                     },
                     WarningBox = {
                         IsNormal = false,
@@ -13033,7 +13048,6 @@ function Library:CreateWindow(WindowInfo)
                         Title = "WARNING",
                         Text = "",
                     },
-
                     Groupboxes = {},
                     Tabboxes = {},
                     DependencyGroupboxes = {},
@@ -13115,10 +13129,14 @@ function Library:CreateWindow(WindowInfo)
 
                 function Tab:RefreshSides()
                     local off = Tab:GetContentOffset()
-                    for _, side in Tab.Sides do
-                        side.Position = UDim2.new(side.Position.X.Scale, 0, 0, off)
-                        side.Size = UDim2.new(0.5, -3, 1, -off)
-                    end
+                    TabLeft.Position = UDim2.new(0, 0, 0, off)
+                    TabLeft.Size = UDim2.new(0.5, -3, 1, -off)
+
+                    TabRight.Position = UDim2.new(1, 0, 0, off)
+                    TabRight.Size = UDim2.new(0.5, -3, 1, -off)
+
+                    TabFull.Position = UDim2.new(0, 0, 0, off)
+                    TabFull.Size = UDim2.new(1, 0, 1, -off)
 
                     if Tab.SubTabs then
                         for _, st in Tab.SubTabs do
@@ -13489,15 +13507,25 @@ function Library:CreateWindow(WindowInfo)
                 function Tab:AddGroupbox(i)
                     local o = self or Tab
                     local s = i.Side or 1
+                    local tSide = o.Sides[1]
                     if typeof(s) == "string" then
-                        s = s:lower() == "left" and 1 or 2
+                        local sl = s:lower()
+                        if sl == "left" then
+                            tSide = o.Sides[1]
+                        elseif sl == "right" then
+                            tSide = o.Sides[2]
+                        elseif sl == "full" or sl == "center" or sl == "both" or sl == "middle" then
+                            tSide = o.Sides[3]
+                        end
+                    elseif typeof(s) == "number" then
+                        tSide = o.Sides[s] or o.Sides[1]
                     end
 
                     local bh = New("Frame", {
                         AutomaticSize = Enum.AutomaticSize.Y,
                         BackgroundTransparency = 1,
                         Size = UDim2.fromScale(1, 0),
-                        Parent = s == 1 and o.Sides[1] or o.Sides[2],
+                        Parent = tSide,
                     })
                     New("UIListLayout", { Padding = UDim.new(0, 6), Parent = bh })
                     New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = bh })
@@ -13724,6 +13752,11 @@ function Library:CreateWindow(WindowInfo)
                 function Tab:AddRightGroupbox(Name, IconName, Visible, Collapsed, DisableCollapsing)
                     return self:AddGroupbox({ Side = 2, Name = Name, IconName = IconName, Visible = Visible, Collapsed = Collapsed, DisableCollapsing = DisableCollapsing })
                 end
+
+                function Tab:AddFullGroupbox(Name, IconName, Visible, Collapsed, DisableCollapsing)
+                    return self:AddGroupbox({ Side = "Full", Name = Name, IconName = IconName, Visible = Visible, Collapsed = Collapsed, DisableCollapsing = DisableCollapsing })
+                end
+                Tab.AddCenterGroupbox = Tab.AddFullGroupbox
 
                 local function SidebarListHeight(): number
                     return SidebarListLayout and SidebarListLayout.AbsoluteContentSize.Y or 0
@@ -14282,8 +14315,17 @@ function Library:CreateWindow(WindowInfo)
                         Size = UDim2.new(0.5, -3, 1, 0),
                         Parent = subCanvas,
                     })
+                    local subFull = New("ScrollingFrame", {
+                        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                        BackgroundTransparency = 1,
+                        CanvasSize = UDim2.fromScale(0, 0),
+                        ScrollBarImageTransparency = 1,
+                        ScrollBarThickness = 0,
+                        Size = UDim2.new(1, 0, 1, 0),
+                        Parent = subCanvas,
+                    })
 
-                    for _, side in { subLeft, subRight } do
+                    for _, side in { subLeft, subRight, subFull } do
                         New("UIListLayout", {
                             Padding = UDim.new(0, 2),
                             Parent = side,
@@ -14316,7 +14358,7 @@ function Library:CreateWindow(WindowInfo)
                         Tab = Tab,
                         Canvas = subCanvas,
                         Button = btn,
-                        Sides = { subLeft, subRight },
+                        Sides = { subLeft, subRight, subFull },
                         Groupboxes = {},
                         Tabboxes = {},
                         DependencyGroupboxes = {},
@@ -14325,16 +14367,22 @@ function Library:CreateWindow(WindowInfo)
                     subTab.AddGroupbox = Tab.AddGroupbox
                     subTab.AddLeftGroupbox = Tab.AddLeftGroupbox
                     subTab.AddRightGroupbox = Tab.AddRightGroupbox
+                    subTab.AddFullGroupbox = Tab.AddFullGroupbox
+                    subTab.AddCenterGroupbox = Tab.AddFullGroupbox
                     subTab.AddTabbox = AddTabbox
                     subTab.AddLeftTabbox = Tab.AddLeftTabbox
                     subTab.AddRightTabbox = Tab.AddRightTabbox
 
                     function subTab:RefreshSides()
                         local off = Tab:GetContentOffset()
-                        for _, side in subTab.Sides do
-                            side.Position = UDim2.new(side.Position.X.Scale, 0, 0, off)
-                            side.Size = UDim2.new(0.5, -3, 1, -off)
-                        end
+                        subLeft.Position = UDim2.new(0, 0, 0, off)
+                        subLeft.Size = UDim2.new(0.5, -3, 1, -off)
+
+                        subRight.Position = UDim2.new(1, 0, 0, off)
+                        subRight.Size = UDim2.new(0.5, -3, 1, -off)
+
+                        subFull.Position = UDim2.new(0, 0, 0, off)
+                        subFull.Size = UDim2.new(1, 0, 1, -off)
                     end
 
                     function subTab:Resize()
@@ -16627,4 +16675,3 @@ end
 
 getgenv().Library = Library
 return Library
-
