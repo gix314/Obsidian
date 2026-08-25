@@ -8310,7 +8310,7 @@ do
         })
         table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius / 2), Parent = lf }))
         New("UIStroke", { Color = "OutlineColor", Parent = lf })
-        local lfp = New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = lf })
+        New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = lf })
 
         local cards = {}
         local open = false
@@ -8332,20 +8332,25 @@ do
             for _, c in cards do
                 if c.f.Visible then vCnt += 1 end
             end
-            return vCnt * cStride + 8
+            return vCnt == 0 and 0 or ((vCnt - 1) * cStride + 26 + 8)
         end
 
         local function twH(tgH, onDone)
             if openTw then StopTween(openTw, true) openTw = nil end
-            openTw = TweenService:Create(lf, Library.TweenInfo, { Size = UDim2.new(1, 0, 0, tgH) })
-            if onDone then
-                local c; c = openTw.Completed:Once(function()
-                    if c then c:Disconnect() end
-                    onDone()
+            if Library.Animations and Library.Animations.Dropdown then
+                local ti = Library.DropdownTransitionInfo or Library.TweenInfo
+                openTw = TweenService:Create(lf, ti, { Size = UDim2.new(1, 0, 0, tgH) })
+                openTw.Completed:Once(function()
+                    if openTw then openTw = nil end
+                    g:Resize()
+                    if onDone then onDone() end
                 end)
+                openTw:Play()
+            else
+                lf.Size = UDim2.new(1, 0, 0, tgH)
+                g:Resize()
+                if onDone then onDone() end
             end
-            openTw:Play()
-            task.defer(function() g:Resize() end)
         end
 
         local function setOpen(st)
@@ -8533,11 +8538,15 @@ do
                     vIdx += 1
                 end
             end
-            if open then twH(math.max(vIdx * cStride + 8, 32)) end
+            if open then twH(gFullH()) end
         end
 
         table.insert(o.Connections, hbx:GetPropertyChangedSignal("Text"):Connect(function() flt(hbx.Text) end))
         table.insert(o.Connections, hb.MouseButton1Click:Connect(function() setOpen(not open) end))
+
+        table.insert(o.Connections, h:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+            g:Resize()
+        end))
 
         function o:SetValue(val)
             if typeof(val) ~= "table" then return end
