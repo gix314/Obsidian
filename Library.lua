@@ -11217,7 +11217,6 @@ function Library:CreateWindow(WindowInfo)
     local BackgroundImage
     local BottomBackground
     local FooterSegments = {}
-    local FooterSegments = {}
     local BuildFooter
     local BuildMiniFooter
     local TopBar
@@ -12728,9 +12727,9 @@ function Library:CreateWindow(WindowInfo)
                 CurrentTabInfo.Visible = true
 
                 if MiniSubtitle and not MiniSubtitleExplicit then
-                    Name = Name or ""
-                    MiniSubtitle.Text = Name
-                    MiniSubtitle.Visible = Name ~= ""
+                    local s = n or ""
+                    MiniSubtitle.Text = s
+                    MiniSubtitle.Visible = s ~= ""
                 end
             end
 
@@ -12765,6 +12764,7 @@ function Library:CreateWindow(WindowInfo)
                 local TabContainer
                 local TabLeft
                 local TabRight
+                local TabFull
                 local TabChevron
                 local TabButtonInfo
                 local SidebarList
@@ -13425,33 +13425,24 @@ function Library:CreateWindow(WindowInfo)
                         end
 
                         function Tab:Destroy()
-                            Tab.Destroyed = true
+                            if TabCanvas then
+                                TabCanvas:Destroy()
+                            elseif TabContainer then
+                                TabContainer:Destroy()
+                            end
 
-                            if Tab.Connections then
-                                for _, Connection in Tab.Connections do
-                                    Connection:Disconnect()
+                            if TabButton then
+                                for Index, Entry in Library.TabButtons do
+                                    if typeof(Entry) == "table" and Entry.Button == TabButton then
+                                        table.remove(Library.TabButtons, Index)
+                                        break
+                                    end
                                 end
+                                
+                                TabButton:Destroy()
                             end
-
-                            for _, Element in Tab.Elements do
-                                if Element.Destroy then
-                                    Element:Destroy()
-                                end
-                            end
-
-                            for _, SubDepbox in Tab.DependencyBoxes do
-                                if SubDepbox.Destroy then
-                                    SubDepbox:Destroy()
-                                end
-                            end
-
-                            if Container then
-                                Container:Destroy()
-                            end
-
-                            if Button then
-                                Button:Destroy()
-                            end
+                            
+                            Library.Tabs[Name] = nil
                         end
 
                         if not Tabbox.ActiveTab then
@@ -16709,3 +16700,4 @@ end
 
 getgenv().Library = Library
 return Library
+
