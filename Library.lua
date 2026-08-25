@@ -398,7 +398,7 @@ local Templates = {
         Resizable = true,
         AlwaysOnTop = false,
 
-        SearchbarSize = UDim2.fromScale(0.35, 1),
+        SearchbarSize = UDim2.fromScale(0.5, 1),
         GlobalSearch = false,
         FuzzySearch = true,
         SearchValues = true,
@@ -4765,10 +4765,14 @@ do
             btn.MouseLeave:Connect(function() TweenService:Create(btn, Library.TweenInfo, { BackgroundTransparency = 1 }):Play() end)
         end
 
-        cCB("Copy color", function() Library.CopiedColor = { o.Value, o.Transparency } end)
-        o.SetValueRGB = function(...) end
+        cCB("Copy color", function()
+            Library.CopiedColor = { o.Value, o.Transparency }
+        end)
+
         cCB("Paste color", function()
-            if Library.CopiedColor then o:SetValueRGB(Library.CopiedColor[1], Library.CopiedColor[2]) end
+            if Library.CopiedColor then
+                o:SetValueRGB(Library.CopiedColor[1], Library.CopiedColor[2])
+            end
         end)
         if sC then
             cCB("Copy Hex", function() sC(tostring(o.Value:ToHex())) end)
@@ -10513,7 +10517,9 @@ function Library:CreateWindow(WindowInfo)
     local BackgroundImage
     local BottomBackground
     local FooterSegments = {}
+    local FooterSegments = {}
     local BuildFooter
+    local BuildMiniFooter
     local TopBar
     local ActiveMarker
     local UpdateMarker
@@ -10733,7 +10739,7 @@ function Library:CreateWindow(WindowInfo)
             Parent = RightWrapper,
         })
         New("UIFlexItem", {
-            FlexMode = Enum.UIFlexMode.Shrink,
+            FlexMode = Enum.UIFlexMode.Fill,
             Parent = SearchBox,
         })
         table.insert(
@@ -12054,13 +12060,11 @@ function Library:CreateWindow(WindowInfo)
                 local TabButton
                 local TabLabel
                 local TabIcon
-
-                local TabContainer
+                local TabHolder
                 local TabCanvas
+                local TabContainer
                 local TabLeft
                 local TabRight
-
-                local TabHolder
                 local TabChevron
                 local TabButtonInfo
                 local SidebarList
