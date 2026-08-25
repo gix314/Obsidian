@@ -2908,321 +2908,279 @@ end
 --// Context Menu \\--
 local CurrentMenu
 function Library:AddContextMenu(
-    Holder: GuiObject,
-    Size: UDim2 | () -> (),
-    Offset: { [number]: number } | () -> {},
-    List: number?,
-    ActiveCallback: (Active: boolean) -> ()?,
-    IgnoreCornerRadius: boolean?,
-    SpecificCornersOnly: ("top" | "bottom" | "no_left" | "no_top_left")?, -- stupid way of doing this
-    AnimationType: ("Dropdown" | "KeyPicker" | "none")?
+    h: GuiObject,
+    sz: UDim2 | () -> (),
+    off: { [number]: number } | () -> {},
+    lst: number?,
+    cb: (boolean) -> ()?,
+    noCr: boolean?,
+    spCr: ("top" | "bottom" | "no_left" | "no_top_left")?,
+    anim: ("Dropdown" | "KeyPicker" | "none")?
 )
-    local Menu
-    local ParentGui = Holder:FindFirstAncestorOfClass("ScreenGui")
-    local MenuZIndex = math.max(10, Holder.ZIndex + 1)
-    if ParentGui ~= ScreenGui and (Library.ActiveLoading and ParentGui ~= Library.ActiveLoading.ScreenGui) then
-        ParentGui = ScreenGui
+    local m
+    local pG = h:FindFirstAncestorOfClass("ScreenGui")
+    local mZ = math.max(10, h.ZIndex + 1)
+    if pG ~= ScreenGui and (Library.ActiveLoading and pG ~= Library.ActiveLoading.ScreenGui) then
+        pG = ScreenGui
     end
 
-    if List then
-        Menu = New("ScrollingFrame", {
+    if lst then
+        m = New("ScrollingFrame", {
             AutomaticCanvasSize = Enum.AutomaticSize.None,
-            AutomaticSize = List == 1 and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
+            AutomaticSize = lst == 1 and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
             BackgroundColor3 = "BackgroundColor",
             BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
             CanvasSize = UDim2.fromOffset(0, 0),
             ScrollBarImageColor3 = "OutlineColor",
-            ScrollBarThickness = List == 2 and 2 or 0,
-            Size = typeof(Size) == "function" and Size() or Size,
+            ScrollBarThickness = lst == 2 and 2 or 0,
+            Size = typeof(sz) == "function" and sz() or sz,
             TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
             Visible = false,
-            ZIndex = MenuZIndex,
-            Parent = ParentGui,
+            ZIndex = mZ,
+            Parent = pG,
         })
     else
-        Menu = New("Frame", {
+        m = New("Frame", {
             BackgroundColor3 = "BackgroundColor",
-            Size = typeof(Size) == "function" and Size() or Size,
+            Size = typeof(sz) == "function" and sz() or sz,
             Visible = false,
-            ZIndex = MenuZIndex,
-            Parent = ParentGui,
+            ZIndex = mZ,
+            Parent = pG,
         })
     end
+
     table.insert(
         Library.Scales,
         New("UIScale", {
-            Parent = Menu,
+            Parent = m,
         })
     )
 
     New("UIStroke", {
         Color = "OutlineColor",
-        Parent = Menu,
+        Parent = m,
     })
 
-    if List == 1 then
-        Table.List = New("UIListLayout", {
-            Parent = Menu,
-        })
-    end
-
-    local Corner;
-    if IgnoreCornerRadius ~= true then
-        if SpecificCornersOnly == "top" then
-            Corner = New("UICorner", {
-                TopLeftRadius = UDim.new(0, Library.CornerRadius / 2),
-                TopRightRadius = UDim.new(0, Library.CornerRadius / 2),
+    local c
+    if noCr ~= true then
+        local r = Library.CornerRadius / 2
+        if spCr == "top" then
+            c = New("UICorner", {
+                TopLeftRadius = UDim.new(0, r),
+                TopRightRadius = UDim.new(0, r),
                 BottomRightRadius = UDim.new(0, 0),
                 BottomLeftRadius = UDim.new(0, 0),
-                Parent = Menu,
-            }); table.insert(Library.SpecificCorners, Corner)
-        elseif SpecificCornersOnly == "bottom" then
-            Corner = New("UICorner", {
+                Parent = m,
+            }); table.insert(Library.SpecificCorners, c)
+        elseif spCr == "bottom" then
+            c = New("UICorner", {
                 TopLeftRadius = UDim.new(0, 0),
                 TopRightRadius = UDim.new(0, 0),
-                BottomRightRadius = UDim.new(0, Library.CornerRadius / 2),
-                BottomLeftRadius = UDim.new(0, Library.CornerRadius / 2),
-                Parent = Menu,
-            }); table.insert(Library.SpecificCorners, Corner)
-        elseif SpecificCornersOnly == "no_left" then
-            Corner = New("UICorner", {
+                BottomRightRadius = UDim.new(0, r),
+                BottomLeftRadius = UDim.new(0, r),
+                Parent = m,
+            }); table.insert(Library.SpecificCorners, c)
+        elseif spCr == "no_left" then
+            c = New("UICorner", {
                 TopLeftRadius = UDim.new(0, 0),
-                TopRightRadius = UDim.new(0, Library.CornerRadius / 2),
-                BottomRightRadius = UDim.new(0, Library.CornerRadius / 2),
+                TopRightRadius = UDim.new(0, r),
+                BottomRightRadius = UDim.new(0, r),
                 BottomLeftRadius = UDim.new(0, 0),
-                Parent = Menu,
-            }); table.insert(Library.SpecificCorners, Corner)
-        elseif SpecificCornersOnly == "no_top_left" then
-            Corner = New("UICorner", {
+                Parent = m,
+            }); table.insert(Library.SpecificCorners, c)
+        elseif spCr == "no_top_left" then
+            c = New("UICorner", {
                 TopLeftRadius = UDim.new(0, 0),
-                TopRightRadius = UDim.new(0, Library.CornerRadius / 2),
-                BottomRightRadius = UDim.new(0, Library.CornerRadius / 2),
-                BottomLeftRadius = UDim.new(0, Library.CornerRadius / 2),
-                Parent = Menu,
-            }); table.insert(Library.SpecificCorners, Corner)
+                TopRightRadius = UDim.new(0, r),
+                BottomRightRadius = UDim.new(0, r),
+                BottomLeftRadius = UDim.new(0, r),
+                Parent = m,
+            }); table.insert(Library.SpecificCorners, c)
         else
-            Corner = New("UICorner", {
-                CornerRadius = UDim.new(0, Library.CornerRadius / 2),
-                Parent = Menu,
-            }); table.insert(Library.Corners, Corner)
+            c = New("UICorner", {
+                CornerRadius = UDim.new(0, r),
+                Parent = m,
+            }); table.insert(Library.Corners, c)
         end
     end
 
-    local Table = {
+    local t = {
         Connections = {},
         Destroyed = false,
-
         Active = false,
-        Holder = Holder,
-        Menu = Menu,
+        Holder = h,
+        Menu = m,
         List = nil,
         Signal = nil,
-
-        Size = Size,
-
-        AutoSizeY = List == 1,
+        Size = sz,
+        AutoSizeY = lst == 1,
         OpenCloseTween = nil,
         Animated = function()
-            if not AnimationType or AnimationType == "none" then
-                return false
-            end
-
-            if not (Library.Animations and Library.Animations[AnimationType] == true) then
-                return false
-            end
-            
-            return true, Library[string.format("%sTransitionInfo", AnimationType)] or TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            if not anim or anim == "none" then return false end
+            if not (Library.Animations and Library.Animations[anim] == true) then return false end
+            return true, Library[string.format("%sTransitionInfo", anim)] or TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         end
     }
 
-    if List then
-        Table.List = New("UIListLayout", {
-            Parent = Menu,
+    if lst == 1 then
+        t.List = New("UIListLayout", {
+            Parent = m,
         })
     end
 
-    function Table:Open()
-        if CurrentMenu == Table then
+    function t:Open()
+        if CurrentMenu == t then
             return
         elseif CurrentMenu then
             CurrentMenu:Close()
         end
 
-        CurrentMenu = Table
-        Table.Active = true
+        CurrentMenu = t
+        t.Active = true
 
-        if typeof(Offset) == "function" then
-            Menu.Position = UDim2.fromOffset(
-                math.floor(Holder.AbsolutePosition.X + Offset()[1]),
-                math.floor(Holder.AbsolutePosition.Y + Offset()[2])
-            )
-        else
-            Menu.Position = UDim2.fromOffset(
-                math.floor(Holder.AbsolutePosition.X + Offset[1]),
-                math.floor(Holder.AbsolutePosition.Y + Offset[2])
-            )
+        local oPos = typeof(off) == "function" and off() or off
+        m.Position = UDim2.fromOffset(
+            math.floor(h.AbsolutePosition.X + oPos[1]),
+            math.floor(h.AbsolutePosition.Y + oPos[2])
+        )
+
+        local tSz = typeof(t.Size) == "function" and t.Size() or t.Size
+
+        if typeof(cb) == "function" then
+            Library:SafeCallback(cb, true)
         end
 
-        local TargetSize = typeof(Table.Size) == "function" and Table.Size() or Table.Size
-
-        if typeof(ActiveCallback) == "function" then
-            Library:SafeCallback(ActiveCallback, true)
+        if t.OpenCloseTween then
+            StopTween(t.OpenCloseTween, true)
+            t.OpenCloseTween = nil
         end
 
-        if Table.OpenCloseTween then
-            StopTween(Table.OpenCloseTween, true)
-            Table.OpenCloseTween = nil
-        end
-
-        local IsAnimated, TweenInfo = Table.Animated()
-        if IsAnimated == true then
-            local OpenSize = TargetSize
-            if Table.AutoSizeY then
-                local FullHeight = Menu.AbsoluteSize.Y
-
-                Menu.AutomaticSize = Enum.AutomaticSize.None
-                OpenSize = UDim2.new(TargetSize.X.Scale, TargetSize.X.Offset, 0, FullHeight)
+        local isA, ti = t.Animated()
+        if isA == true then
+            local oSz = tSz
+            if t.AutoSizeY then
+                local fH = m.AbsoluteSize.Y
+                m.AutomaticSize = Enum.AutomaticSize.None
+                oSz = UDim2.new(tSz.X.Scale, tSz.X.Offset, 0, fH)
             end
 
-            Menu.Size = UDim2.new(OpenSize.X.Scale, OpenSize.X.Offset, 0, 0)
-            Menu.Visible = true
+            m.Size = UDim2.new(oSz.X.Scale, oSz.X.Offset, 0, 0)
+            m.Visible = true
 
-            local Tween = TweenService:Create(Menu, TweenInfo, { Size = OpenSize })
-            Table.OpenCloseTween = Tween
+            local tw = TweenService:Create(m, ti, { Size = oSz })
+            t.OpenCloseTween = tw
 
-            local Connection; Connection = Library:GiveSignal(Tween.Completed:Once(function()
-                if Connection then
-                    Connection:Disconnect()
-                end
-
-                if Table.OpenCloseTween == Tween then
-                    StopTween(Table.OpenCloseTween, true)
-                    Table.OpenCloseTween = nil
-
-                    if Table.AutoSizeY then
-                        Menu.AutomaticSize = Enum.AutomaticSize.Y
+            local conn; conn = Library:GiveSignal(tw.Completed:Once(function()
+                if conn then conn:Disconnect() end
+                if t.OpenCloseTween == tw then
+                    StopTween(t.OpenCloseTween, true)
+                    t.OpenCloseTween = nil
+                    if t.AutoSizeY then
+                        m.AutomaticSize = Enum.AutomaticSize.Y
                     end
                 end
             end))
 
-            Tween:Play()
+            tw:Play()
         else
-            Menu.Size = TargetSize
-            Menu.Visible = true
+            m.Size = tSz
+            m.Visible = true
         end
 
-        Table.Signal = Holder:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
-            if typeof(Offset) == "function" then
-                Menu.Position = UDim2.fromOffset(
-                    math.floor(Holder.AbsolutePosition.X + Offset()[1]),
-                    math.floor(Holder.AbsolutePosition.Y + Offset()[2])
-                )
-            else
-                Menu.Position = UDim2.fromOffset(
-                    math.floor(Holder.AbsolutePosition.X + Offset[1]),
-                    math.floor(Holder.AbsolutePosition.Y + Offset[2])
-                )
-            end
+        t.Signal = h:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+            local cPos = typeof(off) == "function" and off() or off
+            m.Position = UDim2.fromOffset(
+                math.floor(h.AbsolutePosition.X + cPos[1]),
+                math.floor(h.AbsolutePosition.Y + cPos[2])
+            )
 
-            if not Library:IsInsideFrame(Library.WindowContainer, Holder) and Table.Active then
-                Table:Close()
+            if not Library:IsInsideFrame(Library.WindowContainer, h) and t.Active then
+                t:Close()
             end
         end)
     end
 
-    function Table:Close()
-        if CurrentMenu ~= Table then
-            return
+    function t:Close()
+        if CurrentMenu ~= t then return end
+
+        if t.Signal then
+            t.Signal:Disconnect()
+            t.Signal = nil
         end
 
-        if Table.Signal then
-            Table.Signal:Disconnect()
-            Table.Signal = nil
-        end
-
-        Table.Active = false
+        t.Active = false
         CurrentMenu = nil
 
-        if typeof(ActiveCallback) == "function" then
-            Library:SafeCallback(ActiveCallback, false)
+        if typeof(cb) == "function" then
+            Library:SafeCallback(cb, false)
         end
 
-        if Table.OpenCloseTween then
-            StopTween(Table.OpenCloseTween, true)
-            Table.OpenCloseTween = nil
+        if t.OpenCloseTween then
+            StopTween(t.OpenCloseTween, true)
+            t.OpenCloseTween = nil
         end
 
-        local IsAnimated, TweenInfo = Table.Animated()
-        if IsAnimated == true then
-            if Table.AutoSizeY then
-                Menu.AutomaticSize = Enum.AutomaticSize.None
+        local isA, ti = t.Animated()
+        if isA == true then
+            if t.AutoSizeY then
+                m.AutomaticSize = Enum.AutomaticSize.None
             end
 
-            local CurrentSize = Menu.Size
-            local CollapsedSize = UDim2.new(CurrentSize.X.Scale, CurrentSize.X.Offset, 0, 0)
+            local curSz = m.Size
+            local clpSz = UDim2.new(curSz.X.Scale, curSz.X.Offset, 0, 0)
 
-            local Tween = TweenService:Create(Menu, TweenInfo, { Size = CollapsedSize })
-            Table.OpenCloseTween = Tween
+            local tw = TweenService:Create(m, ti, { Size = clpSz })
+            t.OpenCloseTween = tw
 
-            local Connection; Connection = Library:GiveSignal(Tween.Completed:Once(function(PlaybackState)
-                if Connection then
-                    Connection:Disconnect()
-                end
-
-                if Table.OpenCloseTween == Tween then
-                    StopTween(Table.OpenCloseTween, true)
-                    Table.OpenCloseTween = nil
-
-                    Menu.Visible = false
-                    if Table.AutoSizeY then
-                        Menu.AutomaticSize = Enum.AutomaticSize.Y
+            local conn; conn = Library:GiveSignal(tw.Completed:Once(function()
+                if conn then conn:Disconnect() end
+                if t.OpenCloseTween == tw then
+                    StopTween(t.OpenCloseTween, true)
+                    t.OpenCloseTween = nil
+                    m.Visible = false
+                    if t.AutoSizeY then
+                        m.AutomaticSize = Enum.AutomaticSize.Y
                     end
                 end
             end))
 
-            Tween:Play()
+            tw:Play()
         else
-            Menu.Visible = false
+            m.Visible = false
         end
     end
 
-    function Table:Toggle()
-        if Table.Active then
-            Table:Close()
-        else
-            Table:Open()
+    function t:Toggle()
+        if t.Active then t:Close() else t:Open() end
+    end
+
+    function t:SetSize(s)
+        t.Size = s
+        m.Size = typeof(s) == "function" and s() or s
+    end
+
+    function t:Destroy()
+        t.Destroyed = true
+
+        if t.Connections then
+            for _, cn in t.Connections do cn:Disconnect() end
+        end
+
+        if CurrentMenu == t then
+            t:Close()
+        end
+
+        if t.OpenCloseTween then
+            StopTween(t.OpenCloseTween, true)
+            t.OpenCloseTween = nil
+        end
+
+        if m then
+            m:Destroy()
         end
     end
 
-    function Table:SetSize(Size)
-        Table.Size = Size
-        Menu.Size = typeof(Size) == "function" and Size() or Size
-    end
-
-    function Table:Destroy()
-        Table.Destroyed = true
-
-        if Table.Connections then
-            for _, Connection in Table.Connections do
-                Connection:Disconnect()
-            end
-        end
-
-        if CurrentMenu == Table then
-            Table:Close()
-        end
-
-        if Table.OpenCloseTween then
-            StopTween(Table.OpenCloseTween, true)
-            Table.OpenCloseTween = nil
-        end
-
-        if Menu then
-            Menu:Destroy()
-        end
-    end
-
-    return Table
+    return t
 end
 
 Library:GiveSignal(UserInputService.InputBegan:Connect(function(Input: InputObject)
