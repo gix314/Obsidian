@@ -13138,6 +13138,22 @@ function Library:CreateWindow(WindowInfo)
                     TabFull.Position = UDim2.new(0, 0, 0, off)
                     TabFull.Size = UDim2.new(1, 0, 1, -off)
 
+                    local hasL = #TabLeft:GetChildren() > 4
+                    local hasR = #TabRight:GetChildren() > 4
+                    local hasF = #TabFull:GetChildren() > 4
+
+                    TabLeft.Visible = hasL or (not hasF)
+                    TabRight.Visible = hasR or (not hasF)
+                    TabFull.Visible = hasF
+
+                    if hasF and not hasL and not hasR then
+                        TabLeft.Visible = false
+                        TabRight.Visible = false
+                        TabFull.ZIndex = 2
+                    else
+                        TabFull.ZIndex = 1
+                    end
+
                     if Tab.SubTabs then
                         for _, st in Tab.SubTabs do
                             st:RefreshSides()
@@ -13741,6 +13757,8 @@ function Library:CreateWindow(WindowInfo)
 
                     if i.Visible == false then gbox:Hide() end
                     if i.DisableCollapsing ~= true and i.Collapsed == true then gbox:SetCollapsed(true) end
+
+                    o:RefreshSides()
 
                     return gbox
                 end
@@ -14383,6 +14401,22 @@ function Library:CreateWindow(WindowInfo)
 
                         subFull.Position = UDim2.new(0, 0, 0, off)
                         subFull.Size = UDim2.new(1, 0, 1, -off)
+
+                        local hasL = #subLeft:GetChildren() > 4
+                        local hasR = #subRight:GetChildren() > 4
+                        local hasF = #subFull:GetChildren() > 4
+
+                        subLeft.Visible = hasL or (not hasF)
+                        subRight.Visible = hasR or (not hasF)
+                        subFull.Visible = hasF
+
+                        if hasF and not hasL and not hasR then
+                            subLeft.Visible = false
+                            subRight.Visible = false
+                            subFull.ZIndex = 2
+                        else
+                            subFull.ZIndex = 1
+                        end
                     end
 
                     function subTab:Resize()
