@@ -1563,6 +1563,7 @@ local ScreenGui = New("ScreenGui", {
     Name = "Obsidian",
     DisplayOrder = 998,
     ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 })
 ParentUI(ScreenGui)
 Library.ScreenGui = ScreenGui
@@ -1745,17 +1746,11 @@ function Library:MouseIsOverFrame(Frame: GuiObject, Mouse: Vector2): boolean
         and Mouse.Y <= AbsPos.Y + AbsSize.Y
 end
 
-function Library:IsInsideFrame(ParentFrame: GuiObject, Frame: GuiObject)
-    local GuiPos = Frame.AbsolutePosition
-	local GuiSize = Frame.AbsoluteSize
-
-	local FramePos = ParentFrame.AbsolutePosition
-	local FrameSize = ParentFrame.AbsoluteSize
-
-	return GuiPos.X >= FramePos.X
-		and GuiPos.X + GuiSize.X <= FramePos.X + FrameSize.X
-		and GuiPos.Y >= FramePos.Y
-		and GuiPos.Y + GuiSize.Y <= FramePos.Y + FrameSize.Y
+function Library:IsInsideFrame(pf: GuiObject, f: GuiObject): boolean
+    if not pf or not f then return false end
+    local fP, fS = f.AbsolutePosition, f.AbsoluteSize
+    local pP, pS = pf.AbsolutePosition, pf.AbsoluteSize
+    return (fP.Y + fS.Y >= pP.Y) and (fP.Y <= pP.Y + pS.Y)
 end
 
 function Library:SafeCallback(Func: (...any) -> ...any, ...: any)
@@ -7837,7 +7832,7 @@ do
 
         local function bExpP()
             if expO then return end
-            local par = Library.MainFrame
+            local par = Library.Overlay or Library.ScreenGui
             if not par then return end
 
             expO = New("TextButton", {
@@ -7847,7 +7842,7 @@ do
                 Size = UDim2.fromScale(1, 1),
                 Text = "",
                 Visible = false,
-                ZIndex = 8000,
+                ZIndex = 50,
                 Parent = par,
             })
             table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = expO }))
@@ -7859,7 +7854,7 @@ do
                 Position = UDim2.fromScale(0.5, 0.5),
                 Size = UDim2.new(0.7, 0, 0.72, 0),
                 Text = "",
-                ZIndex = 8001,
+                ZIndex = 51,
                 Parent = expO,
             })
             table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = expF }))
@@ -7979,7 +7974,7 @@ do
 
         function rExpL()
             if not expL then return end
-            for btn in expBtns do
+            for btn in pairs(expBtns) do
                 if btn and btn.Parent then btn.Parent:Destroy() end
             end
             table.clear(expBtns)
@@ -8062,7 +8057,8 @@ do
                 expBtns[btn] = tbl
             end
 
-            expG.CellSize = UDim2.new(1 / cols, -6 * (cols - 1) / cols, 0, 28)
+            local padTotal = 20 + 6 * (cols - 1)
+            expG.CellSize = UDim2.new(1 / cols, -math.floor(padTotal / cols), 0, 28)
             expEL.Visible = cnt == 0
         end
 
