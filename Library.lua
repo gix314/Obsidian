@@ -8085,8 +8085,8 @@ do
         return o
     end
 
-    function Funcs:AddList(Idx, Info)
-        Info = Library:Validate(Info, {
+    function Funcs:AddList(i, d)
+        d = Library:Validate(d, {
             Title = "",
             Values = {},
             Height = 150,
@@ -8095,100 +8095,102 @@ do
             Visible = true,
         })
 
-        local Groupbox = self
-        local Container = Groupbox.Container
+        local g = self
+        local c = g.Container
 
-        local List = {
-            Values = Info.Values,
+        local o = {
+            Values = d.Values,
             Value = nil,
             Buttons = {},
-            Callback = Info.Callback,
+            Callback = d.Callback,
             Type = "List",
         }
 
-        local Holder = New("Frame", {
+        local h = New("Frame", {
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, (Info.Title ~= "" and 20 or 0) + Info.Height),
-            Visible = Info.Visible,
-            Parent = Container,
+            Size = UDim2.new(1, 0, 0, (d.Title ~= "" and 20 or 0) + d.Height),
+            Visible = d.Visible,
+            Parent = c,
         })
 
-        if Info.Title ~= "" then
+        if d.Title ~= "" then
             New("TextLabel", {
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 18),
-                Text = Info.Title,
+                Text = d.Title,
                 TextSize = 14,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                Parent = Holder,
+                Parent = h,
             })
         end
 
-        local Box = New("ScrollingFrame", {
+        local bx = New("ScrollingFrame", {
             BackgroundColor3 = "MainColor",
             BorderSizePixel = 0,
-            Position = UDim2.fromOffset(0, Info.Title ~= "" and 20 or 0),
-            Size = UDim2.new(1, 0, 0, Info.Height),
+            Position = UDim2.fromOffset(0, d.Title ~= "" and 20 or 0),
+            Size = UDim2.new(1, 0, 0, d.Height),
             CanvasSize = UDim2.new(0, 0, 0, 0),
             ScrollBarThickness = 3,
             ScrollBarImageColor3 = "OutlineColor",
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
-            Parent = Holder,
+            Parent = h,
         })
-        
-        table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius/2), Parent = Box }))
-        New("UIStroke", { Color = "OutlineColor", Parent = Box })
+        table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius / 2), Parent = bx }))
+        New("UIStroke", { Color = "OutlineColor", Parent = bx })
+        New("UIListLayout", { Parent = bx })
 
-        local ListLayout = New("UIListLayout", { Parent = Box })
+        function o:RunChanged()
+            Library:SafeCallback(o.Callback, o.Value)
+        end
 
-        function List:BuildList()
-            for _, btn in pairs(List.Buttons) do btn:Destroy() end
-            table.clear(List.Buttons)
+        function o:BuildList()
+            for _, btn in pairs(o.Buttons) do btn:Destroy() end
+            table.clear(o.Buttons)
 
-            for _, val in ipairs(List.Values) do
-                local Button = New("TextButton", {
+            for _, val in ipairs(o.Values) do
+                local btn = New("TextButton", {
                     BackgroundColor3 = "AccentColor",
-                    BackgroundTransparency = 1, 
+                    BackgroundTransparency = 1,
                     Size = UDim2.new(1, 0, 0, 25),
                     Text = tostring(val),
                     TextSize = 14,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = Box,
+                    Parent = bx,
                 })
-                New("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = Button })
-                table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius/2), Parent = Button }))
+                New("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = btn })
+                table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius / 2), Parent = btn }))
 
-                Button.MouseButton1Click:Connect(function()
-                    List:SetValue(val)
+                btn.MouseButton1Click:Connect(function()
+                    o:SetValue(val)
                 end)
 
-                List.Buttons[val] = Button
+                o.Buttons[val] = btn
             end
-            if List.Value then List:SetValue(List.Value) end
+            if o.Value then o:SetValue(o.Value) end
         end
 
-        function List:SetValue(val)
-            List.Value = val
-            for item, btn in pairs(List.Buttons) do
-                local isSelected = (item == val)
-                btn.BackgroundTransparency = isSelected and 0.4 or 1
-                btn.TextColor3 = isSelected and Color3.new(1,1,1) or Library.Scheme.FontColor
+        function o:SetValue(val)
+            o.Value = val
+            for itm, btn in pairs(o.Buttons) do
+                local sel = (itm == val)
+                btn.BackgroundTransparency = sel and 0.4 or 1
+                btn.TextColor3 = sel and Color3.new(1, 1, 1) or Library.Scheme.FontColor
             end
-            Library:SafeCallback(List.Callback, val)
+            o:RunChanged()
         end
 
-        function List:SetValues(newValues)
-            List.Values = newValues
-            List:BuildList()
+        function o:SetValues(nv)
+            o.Values = nv
+            o:BuildList()
         end
 
-        List:BuildList()
-        if Info.Default then List:SetValue(Info.Default) end
-        
-        Groupbox:Resize()
-        table.insert(Groupbox.Elements, List)
-        Options[Idx] = List
-        return List
+        o:BuildList()
+        if d.Default then o:SetValue(d.Default) end
+
+        g:Resize()
+        table.insert(g.Elements, o)
+        Options[i] = o
+        return o
     end
 
     local function normList(src, opts)
@@ -8325,6 +8327,11 @@ do
         local dStY = 0
         local dCardStY = 0
 
+        function o:RunChanged()
+            Library:SafeCallback(o.Callback, o.Value)
+            Library:SafeCallback(o.Changed, o.Value)
+        end
+
         local function uSummary()
             local list = o.Value or {}
             ht.Text = #list > 0 and table.concat(list, " > ") or "None"
@@ -8332,8 +8339,8 @@ do
 
         local function gFullH()
             local vCnt = 0
-            for _, c in cards do
-                if c.f.Visible then vCnt += 1 end
+            for _, crd in cards do
+                if crd.f.Visible then vCnt += 1 end
             end
             return vCnt == 0 and 0 or ((vCnt - 1) * cStride + 26 + 8)
         end
@@ -8404,8 +8411,7 @@ do
             TweenService:Create(c1.f, Library.TweenInfo, { Position = UDim2.fromOffset(0, (nI - 1) * cStride) }):Play()
             TweenService:Create(c2.f, Library.TweenInfo, { Position = UDim2.fromOffset(0, (oI - 1) * cStride) }):Play()
 
-            Library:SafeCallback(o.Callback, o.Value)
-            Library:SafeCallback(o.Changed, o.Value)
+            o:RunChanged()
         end
 
         local function rebuildCards()
@@ -8458,8 +8464,8 @@ do
                 })
 
                 local function gIdx()
-                    for i, itm in ipairs(cards) do
-                        if itm.f == cf then return i end
+                    for i_idx, itm in ipairs(cards) do
+                        if itm.f == cf then return i_idx end
                     end
                     return idx
                 end
@@ -8556,8 +8562,7 @@ do
             o.Value = normList(val, o.Values)
             uSummary()
             rebuildCards()
-            Library:SafeCallback(o.Callback, o.Value)
-            Library:SafeCallback(o.Changed, o.Value)
+            o:RunChanged()
         end
 
         function o:SetValues(val)
@@ -8566,8 +8571,7 @@ do
             o.Value = normList(o.Value, val)
             uSummary()
             rebuildCards()
-            Library:SafeCallback(o.Callback, o.Value)
-            Library:SafeCallback(o.Changed, o.Value)
+            o:RunChanged()
         end
 
         function o:GetValue()
