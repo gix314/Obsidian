@@ -203,6 +203,32 @@ local ElementParser = {}; do
     )
 
     CreateParser(
+        "PriorityList", "Options",
+        function(k: string, o: any)
+            return { value = o.Value }
+        end,
+        function(e: any?, d: any)
+            if not e or typeof(d.value) ~= "table" then return end
+            e:SetValue(d.value)
+        end
+    )
+
+    CreateParser(
+        "List", "Options",
+        function(k: string, o: any)
+            return { value = o.Value }
+        end,
+        function(e: any?, d: any)
+            if not e or d.value == nil then return end
+            if e.Value == d.value then
+                if typeof(e.RunChanged) == "function" then e:RunChanged() end
+                return
+            end
+            e:SetValue(d.value)
+        end
+    )
+
+    CreateParser(
         "Groupbox", "Tabs",
         function(Index: string, Groupbox: any, TabIndex: string)
             return { collapsed = Groupbox.Collapsed, tabIdx = TabIndex }
@@ -1548,4 +1574,3 @@ end
 
 SaveManager:BuildFolderTree()
 return SaveManager
-
