@@ -9,6 +9,7 @@ local UserInputService: UserInputService = cloneref(game:GetService("UserInputSe
 local TextService: TextService = cloneref(game:GetService("TextService"))
 local Teams: Teams = cloneref(game:GetService("Teams"))
 local TweenService: TweenService = cloneref(game:GetService("TweenService"))
+local GuiService: GuiService = cloneref(game:GetService("GuiService"))
 
 local getgenv = getgenv or function()
     return shared
@@ -244,6 +245,11 @@ local Library = {
     --// Loading Window \\--
     ActiveLoading = nil,
 
+    OriginalMouseIconEnabled = UserInputService.MouseIconEnabled,
+    Floats = nil,
+    Overlay = nil,
+    ContextMenus = {},
+
     --// Corners \\--
     Corners = {},
     SpecificCorners = {},
@@ -291,6 +297,10 @@ local Library = {
 
     CantDragForced = false,
     DraggableElements = {},
+
+    PopOutSnapDistance = 80,
+    PopOutDragThreshold = 8,
+    PopOutHoldTime = 0.15,
 
     --// Signals \\--
     Signals = {},
@@ -444,6 +454,11 @@ local Templates = {
         SidebarCompactWidth = 48,
         SidebarCollapseThreshold = 0.5,
 
+        Snapping = false,
+        SnapDistance = 28,
+        SnapMargin = 8,
+        SnapAvoidCoreGui = true,
+
         --// Dragging \\--
         CompactWidthActivation = 128,
 
@@ -462,6 +477,21 @@ local Templates = {
         TabTransitionTime = 0.22,
         TabSwipeOffset = 26,
         TabSwipeFrom = "bottom"
+    },
+    Groupbox = {
+        Side = 1,
+        Name = "Groupbox",
+        IconName = nil,
+        Description = nil,
+        Visible = true,
+        Collapsed = false,
+        DisableCollapsing = false,
+        PopOut = true,
+    },
+    Tabbox = {
+        Side = 1,
+        Name = nil,
+        PopOut = true,
     },
     Dialog = {
         Title = "Dialog",
@@ -817,746 +847,388 @@ function Library:UpdateDependencyBoxes()
     end
 end
 
-local MaxSearchedValues = 100
+local function FuzzyScore(txt: string, qry: string): (boolean, number)
+    if qry == "" then return true, 0 end
+    if txt == "" then return false, 0 end
 
-local function IsSubsequence(Haystack: string, Needle: string): boolean
-    local HaystackLen = #Haystack
-    local Index = 1
+    local eIdx = txt:find(qry, 1, true)
+    if eIdx then
+        local prev = eIdx > 1 and txt:sub(eIdx - 1, eIdx - 1) or ""
+        local bnd = eIdx == 1 or prev:match("[%s%p_]") ~= nil
+        return true, 1e5 - eIdx + (bnd and 500 or 0) + (qry:len() * 5)
+    end
 
-    for Position = 1, #Needle do
-        local Char = Needle:sub(Position, Position)
+    local tLen, qLen = txt:len(), qry:len()
+    if qLen > tLen then return false, 0 end
 
-        if Char == " " then
-            continue
-        end
+    local qIdx = 1
+    local sc = 0
+    local rLen = 0
+    local lIdx = 0
 
-        local Found = Haystack:find(Char, Index, true)
-        if not Found then
-            return false
-        end
-
-        Index = Found + 1
-        if Index > HaystackLen + 1 then
-            return false
+    for tIdx = 1, tLen do
+        if qIdx > qLen then break end
+        if txt:sub(tIdx, tIdx) == qry:sub(qIdx, qIdx) then
+            local prev = tIdx > 1 and txt:sub(tIdx - 1, tIdx - 1) or ""
+            local bnd = tIdx == 1 or prev:match("[%s%p_]") ~= nil
+            rLen = (lIdx == tIdx - 1) and (rLen + 1) or 1
+            sc += 1 + (bnd and 6 or 0) + math.min(rLen - 1, 5) * 3
+            lIdx = tIdx
+            qIdx += 1
         end
     end
 
-    return true
+    if qIdx <= qLen then return false, 0 end
+    sc -= (lIdx - qLen) * 0.05
+    return true, sc
 end
 
-local function TextMatches(Text, Search: string): boolean
-    if Search == "" then
-        return true
-    end
-    if typeof(Text) ~= "string" or Text == "" then
-        return false
-    end
-
-    local Lowered = Text:lower()
-
-    if Lowered:find(Search, 1, true) then
-        return true
-    end
-
-    if not Library.FuzzySearch then
-        return false
-    end
-
-    local Stripped = Search:gsub("%s", "")
-    if #Stripped < 2 then
-        return false
-    end
-
-    return IsSubsequence(Lowered, Search)
+local function NormalizeSearch(s: string): string
+    return (s:gsub("%s+", ""))
 end
 
-local function FormatSearchValue(ElementInfo, Value): string?
-    if Value == nil then
-        return nil
-    end
-
-    local Formatter = ElementInfo.FormatListValue or ElementInfo.FormatDisplayValue
-    if Formatter then
-        local Success, Formatted = pcall(Formatter, Value)
-        if Success and Formatted ~= nil then
-            return tostring(Formatted)
-        end
-    end
-
-    local Success, Text = pcall(tostring, Value)
-    return Success and Text or nil
+local function TryFuzzyMatch(txt: any, qry: string): boolean
+    if typeof(txt) ~= "string" or txt == "" then return false end
+    return (FuzzyScore(txt:lower(), qry))
 end
 
-local function ValueMatches(ElementInfo, Search: string): boolean
-    local Type = ElementInfo.Type
+local function FormatSearchValue(el, v): string?
+    if v == nil then return nil end
+    local fmt = el.FormatListValue or el.FormatDisplayValue
+    if fmt then
+        local s, res = pcall(fmt, v)
+        if s and res ~= nil then return tostring(res) end
+    end
+    local s, res = pcall(tostring, v)
+    return s and res or nil
+end
 
-    if Type == "Dropdown" then
-        local Scanned = 0
-
-        if typeof(ElementInfo.Values) == "table" then
-            for _, Value in ElementInfo.Values do
-                Scanned += 1
-                if Scanned > MaxSearchedValues then
-                    break
-                end
-
-                if TextMatches(FormatSearchValue(ElementInfo, Value), Search) then
-                    return true
-                end
+local function ValueMatches(el, qry: string): boolean
+    local t = el.Type
+    if t == "Dropdown" then
+        local sc = 0
+        if typeof(el.Values) == "table" then
+            for _, v in el.Values do
+                sc += 1
+                if sc > 100 then break end
+                if TryFuzzyMatch(FormatSearchValue(el, v), qry) then return true end
             end
         end
-
-        local Value = ElementInfo.Value
-        if ElementInfo.Multi and typeof(Value) == "table" then
-            for Selected, Active in Value do
-                if Active and TextMatches(FormatSearchValue(ElementInfo, Selected), Search) then
-                    return true
-                end
+        local v = el.Value
+        if el.Multi and typeof(v) == "table" then
+            for sel, act in v do
+                if act and TryFuzzyMatch(FormatSearchValue(el, sel), qry) then return true end
             end
-        elseif Value ~= nil and TextMatches(FormatSearchValue(ElementInfo, Value), Search) then
+        elseif v ~= nil and TryFuzzyMatch(FormatSearchValue(el, v), qry) then
             return true
         end
-
         return false
-    elseif Type == "Input" then
-        return TextMatches(ElementInfo.Value, Search)
-    elseif Type == "KeyPicker" then
-        return TextMatches(ElementInfo.Value, Search) or TextMatches(ElementInfo.Mode, Search)
+    elseif t == "Input" then
+        return TryFuzzyMatch(el.Value, qry)
+    elseif t == "KeyPicker" then
+        return TryFuzzyMatch(el.Value, qry) or TryFuzzyMatch(el.Mode, qry)
+    elseif t == "PriorityList" and typeof(el.Value) == "table" then
+        for _, itm in ipairs(el.Value) do
+            if TryFuzzyMatch(tostring(itm), qry) then return true end
+        end
     end
-
     return false
 end
 
-function Library:MatchesSearch(ElementInfo, Search: string): boolean
-    if typeof(ElementInfo) ~= "table" then
-        return false
-    end
-    if typeof(Search) ~= "string" or Trim(Search) == "" then
+function Library:MatchesSearch(el, qry: string, fMatch: boolean?): boolean
+    if typeof(el) ~= "table" then return false end
+    if fMatch or typeof(qry) ~= "string" or Trim(qry) == "" then return true end
+    if TryFuzzyMatch(el.Text, qry) or TryFuzzyMatch(el.Tooltip, qry) or TryFuzzyMatch(el.DisabledTooltip, qry) then
         return true
     end
-
-    if TextMatches(ElementInfo.Text, Search) then
-        return true
-    end
-
-    if not Library.SearchValues then
-        return false
-    end
-
-    if ValueMatches(ElementInfo, Search) then
-        return true
-    end
-
-    if typeof(ElementInfo.Addons) == "table" then
-        for _, Addon in ElementInfo.Addons do
-            if typeof(Addon) == "table" and ValueMatches(Addon, Search) then
-                return true
-            end
+    if not Library.SearchValues then return false end
+    if ValueMatches(el, qry) then return true end
+    if typeof(el.Addons) == "table" then
+        for _, a in el.Addons do
+            if typeof(a) == "table" and ValueMatches(a, qry) then return true end
         end
     end
-
     return false
 end
 
-local function CheckDepbox(Box, Search)
-    local VisibleElements = 0
-
-    for _, ElementInfo in Box.Elements do
-        if ElementInfo.Type == "Divider" then
-            ElementInfo.Holder.Visible = false
+local function CheckDepbox(bx, qry: string, fMatch: boolean?)
+    local visCount = 0
+    for _, el in bx.Elements do
+        if el.Type == "Divider" then
+            el.Holder.Visible = false
             continue
-        elseif ElementInfo.SubButton then
-            local Visible = false
-
-            if Library:MatchesSearch(ElementInfo, Search) and ElementInfo.Visible then
-                Visible = true
+        elseif el.SubButton then
+            local vis = false
+            if Library:MatchesSearch(el, qry, fMatch) and el.Visible then
+                vis = true
             else
-                ElementInfo.Base.Visible = false
+                el.Base.Visible = false
             end
-            if Library:MatchesSearch(ElementInfo.SubButton, Search) and ElementInfo.SubButton.Visible then
-                Visible = true
+            if Library:MatchesSearch(el.SubButton, qry, fMatch) and el.SubButton.Visible then
+                vis = true
             else
-                ElementInfo.SubButton.Base.Visible = false
+                el.SubButton.Base.Visible = false
             end
-            ElementInfo.Holder.Visible = Visible
-            if Visible then
-                VisibleElements += 1
-            end
-
+            el.Holder.Visible = vis
+            if vis then visCount += 1 end
             continue
         end
 
-        if Library:MatchesSearch(ElementInfo, Search) and ElementInfo.Visible then
-            ElementInfo.Holder.Visible = true
-            VisibleElements += 1
+        if Library:MatchesSearch(el, qry, fMatch) and el.Visible then
+            el.Holder.Visible = true
+            visCount += 1
         else
-            ElementInfo.Holder.Visible = false
+            el.Holder.Visible = false
         end
     end
 
-    for _, Depbox in Box.DependencyBoxes do
-        if not Depbox.Visible then
-            continue
-        end
-
-        VisibleElements += CheckDepbox(Depbox, Search)
+    for _, db in bx.DependencyBoxes do
+        if not db.Visible then continue end
+        visCount += CheckDepbox(db, qry, fMatch)
     end
 
-    Box.Holder.Visible = VisibleElements > 0
-    return VisibleElements
+    bx.Holder.Visible = visCount > 0
+    return visCount
+end
+
+local function RestoreDepbox(bx)
+    for _, el in bx.Elements do
+        el.Holder.Visible = el.Visible ~= false
+        if el.SubButton then
+            el.Base.Visible = el.Visible
+            el.SubButton.Base.Visible = el.SubButton.Visible
+        end
+    end
+    bx:Resize()
+    bx.Holder.Visible = true
+    for _, db in bx.DependencyBoxes do
+        if not db.Visible then continue end
+        RestoreDepbox(db)
+    end
 end
 
 local ResetTab
 
-local function ApplySearchToTab(Tab, Search)
-    if not Tab then
-        return
-    end
+local function ApplySearchToTab(tab, qry: string)
+    if not tab then return false end
+    local hasVis = false
+    local tMatch = TryFuzzyMatch(tab.Name, qry) or TryFuzzyMatch(tab.Description, qry)
 
-    local HasVisible = false
+    for _, gb in tab.Groupboxes do
+        if gb.Visible == false then continue end
+        local gbMatch = tMatch or (TryFuzzyMatch(gb.Name, qry) or TryFuzzyMatch(gb.Description, qry))
+        local vCount = 0
 
-    for _, Groupbox in Tab.Groupboxes do
-        if Groupbox.Visible == false then
-            continue
-        end
-
-        local BoxMatched = TextMatches(Groupbox.Name, Search)
-
-        local VisibleElements = 0
-        for _, ElementInfo in Groupbox.Elements do
-            if ElementInfo.Type == "Divider" then
-                ElementInfo.Holder.Visible = BoxMatched and ElementInfo.Visible ~= false
+        for _, el in gb.Elements do
+            if el.Type == "Divider" then
+                el.Holder.Visible = gbMatch and el.Visible ~= false
                 continue
-            elseif ElementInfo.SubButton then
-                local Visible = false
-
-                if (BoxMatched or Library:MatchesSearch(ElementInfo, Search)) and ElementInfo.Visible then
-                    Visible = true
+            elseif el.SubButton then
+                local vis = false
+                if (gbMatch or Library:MatchesSearch(el, qry)) and el.Visible then
+                    vis = true
                 else
-                    ElementInfo.Base.Visible = false
+                    el.Base.Visible = false
                 end
-                if
-                    (BoxMatched or Library:MatchesSearch(ElementInfo.SubButton, Search))
-                    and ElementInfo.SubButton.Visible
-                then
-                    Visible = true
+                if (gbMatch or Library:MatchesSearch(el.SubButton, qry)) and el.SubButton.Visible then
+                    vis = true
                 else
-                    ElementInfo.SubButton.Base.Visible = false
+                    el.SubButton.Base.Visible = false
                 end
-                ElementInfo.Holder.Visible = Visible
-
-                if Visible then
-                    VisibleElements += 1
-                end
-
+                el.Holder.Visible = vis
+                if vis then vCount += 1 end
                 continue
             end
 
-            if (BoxMatched or Library:MatchesSearch(ElementInfo, Search)) and ElementInfo.Visible then
-                ElementInfo.Holder.Visible = true
-                VisibleElements += 1
+            if (gbMatch or Library:MatchesSearch(el, qry)) and el.Visible then
+                el.Holder.Visible = true
+                vCount += 1
             else
-                ElementInfo.Holder.Visible = false
+                el.Holder.Visible = false
             end
         end
 
-        for _, Depbox in Groupbox.DependencyBoxes do
-            if not Depbox.Visible then
-                continue
-            end
-
-            VisibleElements += CheckDepbox(Depbox, Search)
+        for _, db in gb.DependencyBoxes do
+            if not db.Visible then continue end
+            vCount += CheckDepbox(db, qry, gbMatch)
         end
 
-        if VisibleElements > 0 then
-            Groupbox:Resize()
-            HasVisible = true
+        if vCount > 0 then
+            gb:Resize()
+            hasVis = true
         end
-        Groupbox.BoxHolder.Visible = VisibleElements > 0
+        gb.BoxHolder.Visible = vCount > 0
     end
 
-    for _, Tabbox in Tab.Tabboxes do
-        local VisibleTabs = 0
-        local VisibleElements = {}
+    for _, tb in tab.Tabboxes do
+        local vTabs = 0
+        local vElems = {}
 
-        for _, SubTab in Tabbox.Tabs do
-            VisibleElements[SubTab] = 0
+        for _, st in tb.Tabs do
+            vElems[st] = 0
+            local stMatch = tMatch or TryFuzzyMatch(st.Name, qry)
 
-            local BoxMatched = TextMatches(SubTab.Name, Search)
-
-            for _, ElementInfo in SubTab.Elements do
-                if ElementInfo.Type == "Divider" then
-                    ElementInfo.Holder.Visible = BoxMatched and ElementInfo.Visible ~= false
+            for _, el in st.Elements do
+                if el.Type == "Divider" then
+                    el.Holder.Visible = stMatch and el.Visible ~= false
                     continue
-                elseif ElementInfo.SubButton then
-                    local Visible = false
-
-                    if (BoxMatched or Library:MatchesSearch(ElementInfo, Search)) and ElementInfo.Visible then
-                        Visible = true
+                elseif el.SubButton then
+                    local vis = false
+                    if (stMatch or Library:MatchesSearch(el, qry)) and el.Visible then
+                        vis = true
                     else
-                        ElementInfo.Base.Visible = false
+                        el.Base.Visible = false
                     end
-                    if
-                        (BoxMatched or Library:MatchesSearch(ElementInfo.SubButton, Search))
-                        and ElementInfo.SubButton.Visible
-                    then
-                        Visible = true
+                    if (stMatch or Library:MatchesSearch(el.SubButton, qry)) and el.SubButton.Visible then
+                        vis = true
                     else
-                        ElementInfo.SubButton.Base.Visible = false
+                        el.SubButton.Base.Visible = false
                     end
-                    ElementInfo.Holder.Visible = Visible
-                    if Visible then
-                        VisibleElements[SubTab] += 1
-                    end
-
+                    el.Holder.Visible = vis
+                    if vis then vElems[st] += 1 end
                     continue
                 end
 
-                if (BoxMatched or Library:MatchesSearch(ElementInfo, Search)) and ElementInfo.Visible then
-                    ElementInfo.Holder.Visible = true
-                    VisibleElements[SubTab] += 1
+                if (stMatch or Library:MatchesSearch(el, qry)) and el.Visible then
+                    el.Holder.Visible = true
+                    vElems[st] += 1
                 else
-                    ElementInfo.Holder.Visible = false
+                    el.Holder.Visible = false
                 end
             end
 
-            for _, Depbox in SubTab.DependencyBoxes do
-                if not Depbox.Visible then
-                    continue
-                end
-
-                VisibleElements[SubTab] += CheckDepbox(Depbox, Search)
+            for _, db in st.DependencyBoxes do
+                if not db.Visible then continue end
+                vElems[st] += CheckDepbox(db, qry, stMatch)
             end
         end
 
-        for SubTab, Visible in VisibleElements do
-            SubTab.ButtonHolder.Visible = Visible > 0
-            if Visible > 0 then
-                VisibleTabs += 1
-                HasVisible = true
-
-                if Tabbox.ActiveTab == SubTab then
-                    SubTab:Resize()
-                elseif Tabbox.ActiveTab and VisibleElements[Tabbox.ActiveTab] == 0 then
-                    SubTab:Show()
+        for st, v in vElems do
+            st.ButtonHolder.Visible = v > 0
+            if v > 0 then
+                vTabs += 1
+                hasVis = true
+                if tb.ActiveTab == st then
+                    st:Resize()
+                elseif tb.ActiveTab and vElems[tb.ActiveTab] == 0 then
+                    st:Show()
                 end
             end
         end
-
-        Tabbox.BoxHolder.Visible = VisibleTabs > 0
+        tb.BoxHolder.Visible = vTabs > 0
     end
 
-    if Tab.SubTabs then
-        local VisibleSubTabs = {}
-
-        for _, SubTab in Tab.SubTabs do
-            local SubVisible
-            if TextMatches(SubTab.Name, Search) then
-                ResetTab(SubTab)
-                SubVisible = true
+    if tab.SubTabs then
+        local vSubTabs = {}
+        for _, st in tab.SubTabs do
+            local stVis
+            if TryFuzzyMatch(st.Name, qry) then
+                ResetTab(st)
+                stVis = true
             else
-                SubVisible = ApplySearchToTab(SubTab, Search)
+                stVis = ApplySearchToTab(st, qry)
             end
-            VisibleSubTabs[SubTab] = SubVisible
-
-            SubTab.Button.Visible = SubVisible
-            if SubVisible then
-                HasVisible = true
-            end
+            vSubTabs[st] = stVis
+            st.Button.Visible = stVis
+            if stVis then hasVis = true end
         end
 
-        local Active = Tab.ActiveSubTab
-        if Active and VisibleSubTabs[Active] == false then
-            for SubTab, SubVisible in VisibleSubTabs do
-                if SubVisible then
-                    SubTab:Show()
+        local act = tab.ActiveSubTab
+        if act and vSubTabs[act] == false then
+            for st, sVis in vSubTabs do
+                if sVis then
+                    st:Show()
                     break
                 end
             end
         end
     end
 
-    return HasVisible
+    return hasVis
 end
 
-local function CheckDepbox(Box, Search)
-    local VisibleElements = 0
+function ResetTab(tab)
+    if not tab then return end
 
-    for _, ElementInfo in Box.Elements do
-        if ElementInfo.Type == "Divider" then
-            ElementInfo.Holder.Visible = false
-            continue
-        elseif ElementInfo.SubButton then
-            --// Check if any of the Buttons Name matches with Search
-            local Visible = false
-
-            --// Check if Search matches Element's Name and if Element is Visible
-            if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                Visible = true
-            else
-                ElementInfo.Base.Visible = false
+    for _, gb in tab.Groupboxes do
+        for _, el in gb.Elements do
+            el.Holder.Visible = el.Visible ~= false
+            if el.SubButton then
+                el.Base.Visible = el.Visible
+                el.SubButton.Base.Visible = el.SubButton.Visible
             end
-            if ElementInfo.SubButton.Text:lower():match(Search) and ElementInfo.SubButton.Visible then
-                Visible = true
-            else
-                ElementInfo.SubButton.Base.Visible = false
-            end
-            ElementInfo.Holder.Visible = Visible
-            if Visible then
-                VisibleElements += 1
-            end
-
-            continue
         end
 
-        --// Check if Search matches Element's Name and if Element is Visible
-        if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-            ElementInfo.Holder.Visible = true
-            VisibleElements += 1
-        else
-            ElementInfo.Holder.Visible = false
+        for _, db in gb.DependencyBoxes do
+            if not db.Visible then continue end
+            RestoreDepbox(db)
         end
+
+        if gb.Tabboxes then
+            for _, tb in gb.Tabboxes do
+                for _, st in tb.Tabs do
+                    for _, el in st.Elements do
+                        el.Holder.Visible = el.Visible ~= false
+                        if el.SubButton then
+                            el.Base.Visible = el.Visible
+                            el.SubButton.Base.Visible = el.SubButton.Visible
+                        end
+                    end
+                    for _, db in st.DependencyBoxes do
+                        if not db.Visible then continue end
+                        RestoreDepbox(db)
+                    end
+                    st.ButtonHolder.Visible = true
+                end
+                if tb.ActiveTab then tb.ActiveTab:Resize() end
+                tb.BoxHolder.Visible = true
+            end
+        end
+
+        gb:Resize()
+        gb.BoxHolder.Visible = gb.Visible ~= false
     end
 
-    for _, Depbox in Box.DependencyBoxes do
-        if not Depbox.Visible then
-            continue
+    for _, tb in tab.Tabboxes do
+        for _, st in tb.Tabs do
+            for _, el in st.Elements do
+                el.Holder.Visible = el.Visible ~= false
+                if el.SubButton then
+                    el.Base.Visible = el.Visible
+                    el.SubButton.Base.Visible = el.SubButton.Visible
+                end
+            end
+            for _, db in st.DependencyBoxes do
+                if not db.Visible then continue end
+                RestoreDepbox(db)
+            end
+            st.ButtonHolder.Visible = true
         end
-
-        VisibleElements += CheckDepbox(Depbox, Search)
-    end
-
-    Box.Holder.Visible = VisibleElements > 0
-    return VisibleElements
-end
-local function RestoreDepbox(Box)
-    for _, ElementInfo in Box.Elements do
-        ElementInfo.Holder.Visible = ElementInfo.Visible ~= false
-
-        if ElementInfo.SubButton then
-            ElementInfo.Base.Visible = ElementInfo.Visible
-            ElementInfo.SubButton.Base.Visible = ElementInfo.SubButton.Visible
-        end
-    end
-
-    Box:Resize()
-    Box.Holder.Visible = true
-
-    for _, Depbox in Box.DependencyBoxes do
-        if not Depbox.Visible then
-            continue
-        end
-
-        RestoreDepbox(Depbox)
+        if tb.ActiveTab then tb.ActiveTab:Resize() end
+        tb.BoxHolder.Visible = true
     end
 end
 
-local function ApplySearchToTab(Tab, Search)
-    if not Tab then
-        return
-    end
-
-    local HasVisible = false
-
-    for _, Groupbox in Tab.Groupboxes do
-        if Groupbox.Visible == false then
-            continue
-        end
-
-        local VisibleElements = 0
-        for _, ElementInfo in Groupbox.Elements do
-            if ElementInfo.Type == "Divider" then
-                ElementInfo.Holder.Visible = false
-                continue
-            elseif ElementInfo.SubButton then
-                local Visible = false
-
-                if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                    Visible = true
-                else
-                    ElementInfo.Base.Visible = false
-                end
-                if ElementInfo.SubButton.Text:lower():match(Search) and ElementInfo.SubButton.Visible then
-                    Visible = true
-                else
-                    ElementInfo.SubButton.Base.Visible = false
-                end
-                ElementInfo.Holder.Visible = Visible
-
-                if Visible then
-                    VisibleElements += 1
-                end
-
-                continue
-            end
-
-            if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                ElementInfo.Holder.Visible = true
-                VisibleElements += 1
-            else
-                ElementInfo.Holder.Visible = false
-            end
-        end
-
-        for _, Depbox in Groupbox.DependencyBoxes do
-            if not Depbox.Visible then
-                continue
-            end
-
-            VisibleElements += CheckDepbox(Depbox, Search)
-        end
-
-        if Groupbox.Tabboxes then
-            for _, Tabbox in Groupbox.Tabboxes do
-                local VisibleTabs = 0
-                local VisibleElementsInTabbox = {}
-
-                for _, SubTab in Tabbox.Tabs do
-                    VisibleElementsInTabbox[SubTab] = 0
-
-                    for _, ElementInfo in SubTab.Elements do
-                        if ElementInfo.Type == "Divider" then
-                            ElementInfo.Holder.Visible = false
-                            continue
-                        elseif ElementInfo.SubButton then
-                            local Visible = false
-
-                            if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                                Visible = true
-                            else
-                                ElementInfo.Base.Visible = false
-                            end
-                            if ElementInfo.SubButton.Text:lower():match(Search) and ElementInfo.SubButton.Visible then
-                                Visible = true
-                            else
-                                ElementInfo.SubButton.Base.Visible = false
-                            end
-                            ElementInfo.Holder.Visible = Visible
-                            if Visible then
-                                VisibleElementsInTabbox[SubTab] += 1
-                            end
-
-                            continue
-                        end
-
-                        if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                            ElementInfo.Holder.Visible = true
-                            VisibleElementsInTabbox[SubTab] += 1
-                        else
-                            ElementInfo.Holder.Visible = false
-                        end
-                    end
-
-                    for _, Depbox in SubTab.DependencyBoxes do
-                        if not Depbox.Visible then
-                            continue
-                        end
-
-                        VisibleElementsInTabbox[SubTab] += CheckDepbox(Depbox, Search)
-                    end
-                end
-
-                for SubTab, Visible in VisibleElementsInTabbox do
-                    SubTab.ButtonHolder.Visible = Visible > 0
-                    if Visible > 0 then
-                        VisibleTabs += 1
-                        VisibleElements += 1
-
-                        if Tabbox.ActiveTab == SubTab then
-                            SubTab:Resize()
-                        elseif Tabbox.ActiveTab and (VisibleElementsInTabbox[Tabbox.ActiveTab] or 0) == 0 then
-                            SubTab:Show()
-                        end
-                    end
-                end
-
-                Tabbox.BoxHolder.Visible = VisibleTabs > 0
-            end
-        end
-
-        if VisibleElements > 0 then
-            Groupbox:Resize()
-            HasVisible = true
-        end
-        Groupbox.BoxHolder.Visible = VisibleElements > 0
-    end
-
-    for _, Tabbox in Tab.Tabboxes do
-        local VisibleTabs = 0
-        local VisibleElements = {}
-
-        for _, SubTab in Tabbox.Tabs do
-            VisibleElements[SubTab] = 0
-
-            for _, ElementInfo in SubTab.Elements do
-                if ElementInfo.Type == "Divider" then
-                    ElementInfo.Holder.Visible = false
-                    continue
-                elseif ElementInfo.SubButton then
-                    local Visible = false
-
-                    if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                        Visible = true
-                    else
-                        ElementInfo.Base.Visible = false
-                    end
-                    if ElementInfo.SubButton.Text:lower():match(Search) and ElementInfo.SubButton.Visible then
-                        Visible = true
-                    else
-                        ElementInfo.SubButton.Base.Visible = false
-                    end
-                    ElementInfo.Holder.Visible = Visible
-                    if Visible then
-                        VisibleElements[SubTab] += 1
-                    end
-
-                    continue
-                end
-
-                if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                    ElementInfo.Holder.Visible = true
-                    VisibleElements[SubTab] += 1
-                else
-                    ElementInfo.Holder.Visible = false
-                end
-            end
-
-            for _, Depbox in SubTab.DependencyBoxes do
-                if not Depbox.Visible then
-                    continue
-                end
-
-                VisibleElements[SubTab] += CheckDepbox(Depbox, Search)
-            end
-        end
-
-        for SubTab, Visible in VisibleElements do
-            SubTab.ButtonHolder.Visible = Visible > 0
-            if Visible > 0 then
-                VisibleTabs += 1
-                HasVisible = true
-
-                if Tabbox.ActiveTab == SubTab then
-                    SubTab:Resize()
-                elseif Tabbox.ActiveTab and (VisibleElements[Tabbox.ActiveTab] or 0) == 0 then
-                    SubTab:Show()
-                end
-            end
-        end
-
-        Tabbox.BoxHolder.Visible = VisibleTabs > 0
-    end
-
-    return HasVisible
-end
-
-local function ResetTab(Tab)
-    if not Tab then
-        return
-    end
-
-    for _, Groupbox in Tab.Groupboxes do
-        for _, ElementInfo in Groupbox.Elements do
-            ElementInfo.Holder.Visible = ElementInfo.Visible ~= false
-
-            if ElementInfo.SubButton then
-                ElementInfo.Base.Visible = ElementInfo.Visible
-                ElementInfo.SubButton.Base.Visible = ElementInfo.SubButton.Visible
-            end
-        end
-
-        for _, Depbox in Groupbox.DependencyBoxes do
-            if not Depbox.Visible then
-                continue
-            end
-
-            RestoreDepbox(Depbox)
-        end
-
-        if Groupbox.Tabboxes then
-            for _, Tabbox in Groupbox.Tabboxes do
-                for _, SubTab in Tabbox.Tabs do
-                    for _, ElementInfo in SubTab.Elements do
-                        ElementInfo.Holder.Visible = ElementInfo.Visible ~= false
-
-                        if ElementInfo.SubButton then
-                            ElementInfo.Base.Visible = ElementInfo.Visible
-                            ElementInfo.SubButton.Base.Visible = ElementInfo.SubButton.Visible
-                        end
-                    end
-
-                    for _, Depbox in SubTab.DependencyBoxes do
-                        if not Depbox.Visible then
-                            continue
-                        end
-
-                        RestoreDepbox(Depbox)
-                    end
-
-                    SubTab.ButtonHolder.Visible = true
-                end
-
-                if Tabbox.ActiveTab then
-                    Tabbox.ActiveTab:Resize()
-                end
-                Tabbox.BoxHolder.Visible = true
-            end
-        end
-
-        Groupbox:Resize()
-        Groupbox.BoxHolder.Visible = Groupbox.Visible ~= false
-    end
-
-    for _, Tabbox in Tab.Tabboxes do
-        for _, SubTab in Tabbox.Tabs do
-            for _, ElementInfo in SubTab.Elements do
-                ElementInfo.Holder.Visible = ElementInfo.Visible ~= false
-
-                if ElementInfo.SubButton then
-                    ElementInfo.Base.Visible = ElementInfo.Visible
-                    ElementInfo.SubButton.Base.Visible = ElementInfo.SubButton.Visible
-                end
-            end
-
-            for _, Depbox in SubTab.DependencyBoxes do
-                if not Depbox.Visible then
-                    continue
-                end
-
-                RestoreDepbox(Depbox)
-            end
-
-            SubTab.ButtonHolder.Visible = true
-        end
-
-        if Tabbox.ActiveTab then
-            Tabbox.ActiveTab:Resize()
-        end
-        Tabbox.BoxHolder.Visible = true
-    end
-end
-
-function Library:UpdateSearch(SearchText)
-    Library.SearchText = SearchText
-
-    local TabsToReset = {}
+function Library:UpdateSearch(txt: string)
+    Library.SearchText = txt
+    local tReset = {}
 
     if Library.GlobalSearch then
-        for _, Tab in Library.Tabs do
-            if typeof(Tab) == "table" and not Tab.IsKeyTab then
-                table.insert(TabsToReset, Tab)
+        for _, tab in Library.Tabs do
+            if typeof(tab) == "table" and not tab.IsKeyTab then
+                table.insert(tReset, tab)
             end
         end
     elseif Library.LastSearchTab and typeof(Library.LastSearchTab) == "table" then
-        table.insert(TabsToReset, Library.LastSearchTab)
+        table.insert(tReset, Library.LastSearchTab)
     end
 
-    for _, Tab in ipairs(TabsToReset) do
-        ResetTab(Tab)
+    for _, tab in ipairs(tReset) do
+        ResetTab(tab)
     end
 
-    local Search = SearchText:lower()
-    if Trim(Search) == "" then
+    local qry = NormalizeSearch(txt:lower())
+    if Trim(qry) == "" then
         Library.Searching = false
         Library.LastSearchTab = nil
         return
@@ -1568,50 +1240,40 @@ function Library:UpdateSearch(SearchText)
     end
 
     Library.Searching = true
-
-    local TabsToSearch = {}
+    local tSearch = {}
 
     if Library.GlobalSearch then
-        TabsToSearch = TabsToReset
-        if #TabsToSearch == 0 then
-            for _, Tab in Library.Tabs do
-                if typeof(Tab) == "table" and not Tab.IsKeyTab then
-                    table.insert(TabsToSearch, Tab)
+        tSearch = tReset
+        if #tSearch == 0 then
+            for _, tab in Library.Tabs do
+                if typeof(tab) == "table" and not tab.IsKeyTab then
+                    table.insert(tSearch, tab)
                 end
             end
         end
     elseif Library.ActiveTab then
-        table.insert(TabsToSearch, Library.ActiveTab)
+        table.insert(tSearch, Library.ActiveTab)
     end
 
-    local FirstVisibleTab = nil
-    local ActiveHasVisible = false
+    local fTab = nil
+    local aHasVis = false
 
-    for _, Tab in ipairs(TabsToSearch) do
-        local HasVisible = ApplySearchToTab(Tab, Search)
-        if HasVisible then
-            if not FirstVisibleTab then
-                FirstVisibleTab = Tab
-            end
-            if Tab == Library.ActiveTab then
-                ActiveHasVisible = true
-            end
+    for _, tab in ipairs(tSearch) do
+        local hasVis = ApplySearchToTab(tab, qry)
+        if hasVis then
+            if not fTab then fTab = tab end
+            if tab == Library.ActiveTab then aHasVis = true end
         end
     end
 
     if Library.GlobalSearch then
-        if ActiveHasVisible and Library.ActiveTab then
+        if aHasVis and Library.ActiveTab then
             Library.ActiveTab:RefreshSides()
-        elseif FirstVisibleTab then
-            local SearchMarker = SearchText
+        elseif fTab then
+            local marker = txt
             task.defer(function()
-                if Library.SearchText ~= SearchMarker then
-                    return
-                end
-
-                if Library.ActiveTab ~= FirstVisibleTab then
-                    FirstVisibleTab:Show()
-                end
+                if Library.SearchText ~= marker then return end
+                if Library.ActiveTab ~= fTab then fTab:Show() end
             end)
         end
         Library.LastSearchTab = nil
@@ -1644,13 +1306,16 @@ function Library:SetDPIScale(DPIScale: number)
     Library.DPIScale = DPIScale / 100
     Library.MinSize = Library.OriginalMinSize * Library.DPIScale
 
-	for _, UIScale in Library.Scales do
+    for _, UIScale in Library.Scales do
         UIScale.Scale = Library.DPIScale - (tonumber(Library.ScalesOffset[UIScale]) or 0)
     end
 
     for _, Option in Options do
         if Option.Type == "Dropdown" then
             Option:RecalculateListSize()
+            if Option.RefreshPool then
+                Option:RefreshPool()
+            end
         end
     end
 
@@ -1699,6 +1364,24 @@ function Library:GetIcon(n: string)
     local s, ic = pcall(Icons.GetAsset, n)
     if not s then return end
     return ic
+end
+
+function Library:ApplyLucideIcon(g: any, ic: any, rot: number?)
+    if not g or not ic then return end
+    if not (g:IsA("ImageLabel") or g:IsA("ImageButton")) then return end
+    g.Image = ic.Url or g.Image
+    g.ImageRectOffset = ic.ImageRectOffset or g.ImageRectOffset
+    g.ImageRectSize = ic.ImageRectSize or g.ImageRectSize
+    if rot then g.Rotation = rot end
+end
+
+local function RestoreMouseIcon()
+    pcall(function()
+        RunService:UnbindFromRenderStep(Library.ShowCursorBinding)
+        RunService.RenderStepped:Wait()
+    end)
+    UserInputService.MouseIconEnabled = Library.OriginalMouseIconEnabled
+    if Cursor then Cursor.Visible = false end
 end
 
 function Library:GetCustomIcon(n: string): any
@@ -1828,9 +1511,33 @@ local ScreenGui = New("ScreenGui", {
 ParentUI(ScreenGui)
 Library.ScreenGui = ScreenGui
 
-ScreenGui.DescendantRemoving:Connect(function(Instance)
-    Library:RemoveFromRegistry(Instance)
+ScreenGui.DescendantRemoving:Connect(function(ins)
+    task.defer(function()
+        if ins.Parent and ins:IsDescendantOf(ScreenGui) then
+            return
+        end
+        Library:RemoveFromRegistry(ins)
+    end)
 end)
+
+local Floats = New("Frame", {
+    BackgroundTransparency = 1,
+    Size = UDim2.fromScale(1, 1),
+    ZIndex = 10,
+    Active = false,
+    Parent = ScreenGui,
+})
+
+local Overlay = New("Frame", {
+    BackgroundTransparency = 1,
+    Size = UDim2.fromScale(1, 1),
+    ZIndex = 20,
+    Active = false,
+    Parent = ScreenGui,
+})
+
+Library.Floats = Floats
+Library.Overlay = Overlay
 
 local ModalElement = New("TextButton", {
     BackgroundTransparency = 1,
@@ -2090,83 +1797,548 @@ function PositionDraggable(UI: GuiObject, StartPos: UDim2?)
     UI.Position = GetNonOverlappingPosition(UI, StartPos)
 end
 
-function Library:MakeDraggable(UI: GuiObject, DragFrame: GuiObject, IgnoreToggled: boolean?, IsMainWindow: boolean?)
-    local StartPos
-    local FramePos
-    local Dragging = false
-    local Changed
-    local InputBegan
-    local InputChanged
+local function GetCoreGuiInset(): (Vector2, Vector2)
+    local s, tl, br = pcall(function()
+        return GuiService:GetGuiInset()
+    end)
+    if s and tl and br then
+        return tl, br
+    end
+    return Vector2.zero, Vector2.zero
+end
 
-    InputBegan = DragFrame.InputBegan:Connect(function(Input: InputObject)
-        if not IsClickInput(Input) or IsMainWindow and Library.CantDragForced then
+local function GetSnapEdges(es: Vector2, vp: Vector2, mg: number, acg: boolean)
+    local sMin, sMax = Vector2.zero, vp
+    if acg then
+        local tl, br = GetCoreGuiInset()
+        sMin = tl
+        sMax = vp - br
+    end
+    local tx = {
+        LeftEdge = sMin.X + mg,
+        Center = sMin.X + (sMax.X - sMin.X - es.X) / 2,
+        RightEdge = sMax.X - es.X - mg,
+    }
+    local ty = {
+        TopEdge = sMin.Y + mg,
+        Center = sMin.Y + (sMax.Y - sMin.Y - es.Y) / 2,
+        BottomEdge = sMax.Y - es.Y - mg,
+    }
+    return tx, ty
+end
+
+local function GetClosestSnapTarget(val: number, tgts: { [string]: number }, dst: number): (number?, string?)
+    local cn, cv, cd = nil, nil, dst
+    for n, t in tgts do
+        local d = math.abs(val - t)
+        if d <= cd then
+            cd = d
+            cn = n
+            cv = t
+        end
+    end
+    return cv, cn
+end
+
+local function GetSnapGuideOffset(n: string, sv: number, ed: number): number
+    if n == "RightEdge" or n == "BottomEdge" then
+        return sv + ed
+    elseif n == "Center" then
+        return sv + ed / 2
+    end
+    return sv
+end
+
+function SyncPopOutVisibility(bx: any)
+    if not bx.PopOutFloat then return end
+    bx.PopOutFloat.Visible = bx.BoxHolder.Visible ~= false and bx.Visible ~= false
+end
+
+local function DimPopOutClone(rt: GuiObject)
+    for _, d in rt:QueryDescendants("TextLabel, TextButton, TextBox") do
+        d.TextTransparency = math.max(d.TextTransparency, 0.45)
+    end
+    for _, d in rt:QueryDescendants("ImageLabel, ImageButton") do
+        d.ImageTransparency = math.max(d.ImageTransparency, 0.45)
+    end
+    for _, d in rt:QueryDescendants("GuiButton") do
+        d.Active = false
+        d.AutoButtonColor = false
+    end
+end
+
+local function IsScreenPointOutsideMain(pt: Vector2): boolean
+    local mf = Library.MainFrame
+    if not mf or not Library.Toggled or not mf.Visible then
+        return true
+    end
+    return not Library:MouseIsOverFrame(mf, pt)
+end
+
+local function GetTopFloatAt(pt: Vector2): GuiObject?
+    local bst: GuiObject? = nil
+    local bO = -math.huge
+    local flts = Library.Floats
+
+    for _, srf in Library.DraggableElements do
+        if not srf or not srf.Parent or not srf.Visible then continue end
+        if flts and srf.Parent ~= flts then continue end
+        if not Library:MouseIsOverFrame(srf, pt) then continue end
+
+        local sIdx = tonumber(select(2, pcall(function() return srf:GetSiblingIndex() end))) or 0
+        local ord = srf.ZIndex * 100000 + sIdx
+        if ord >= bO then
+            bO = ord
+            bst = srf
+        end
+    end
+
+    return bst
+end
+
+local function GetPopOutBodyMaxHeight(bx: any, rsv: number): number
+    local flt = bx.PopOutFloat
+    local sg = Library.ScreenGui
+    if not flt or not sg then return math.huge end
+
+    local gap = 12 * Library.DPIScale
+    local maxB = sg.AbsolutePosition.Y + sg.AbsoluteSize.Y - gap
+    local avl = math.min(maxB - flt.AbsolutePosition.Y, sg.AbsoluteSize.Y * 0.9)
+
+    return math.max(0, avl / Library.DPIScale - rsv)
+end
+
+function Library:MakeBoxPopOut(bx: any, opts: {
+    Enabled: boolean?,
+    Header: GuiObject?,
+    Children: (() -> { GuiObject })?,
+    Before: (() -> ())?,
+    After: (() -> ())?,
+})
+    bx.PoppedOut = false
+    bx.PopOutEnabled = opts.Enabled ~= false
+    bx.PopOutFloat = nil
+    bx.PopOutPlaceholder = nil
+
+    if not bx.PopOutEnabled then
+        function bx:SetPoppedOut() end
+        function bx:TogglePoppedOut() end
+        function bx:RefreshPopOutPlaceholder() end
+        return
+    end
+
+    local bh = bx.BoxHolder
+    local hld = bx.Holder
+    local hdr = opts.Header
+
+    local plc
+    local plcHdr
+    local flt
+    local fltSc
+
+    local hCh = {}
+    local oPar = {}
+    local oOrd = {}
+
+    local dSt = "Idle"
+    local dIn = nil
+    local pMs = nil
+    local dSp = nil
+    local dChg = nil
+    local dMov = false
+
+    local function raiseFlt()
+        if not flt or not Library.Floats then return end
+        local mZ = flt.ZIndex
+        for _, ch in Library.Floats:GetChildren() do
+            if ch:IsA("GuiObject") and ch ~= flt then
+                mZ = math.max(mZ, ch.ZIndex)
+            end
+        end
+        flt.ZIndex = mZ + 1
+        if flt.Parent == Library.Floats then
+            flt.Parent = Library.Overlay
+        end
+        flt.Parent = Library.Floats
+    end
+
+    local function createPlc()
+        local fr = New("Frame", {
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundColor3 = "BackgroundColor",
+            BackgroundTransparency = 0.12,
+            ClipsDescendants = true,
+            Size = UDim2.new(1, 0, 0, 0),
+            Parent = bh,
+        })
+        table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, Library.CornerRadius), Parent = fr }))
+        Library:AddOutline(fr)
+
+        plcHdr = hdr:Clone()
+        plcHdr.Parent = fr
+        DimPopOutClone(plcHdr)
+
+        local poi = PopOutIcon or Library:GetIcon("square-arrow-down-left")
+        if poi then
+            local dkBtn = New("ImageButton", {
+                AutoButtonColor = false,
+                AnchorPoint = Vector2.new(1, 0.5),
+                BackgroundTransparency = 1,
+                ImageColor3 = "WhiteColor",
+                Position = UDim2.new(1, -8, 0.5, 0),
+                Size = UDim2.fromOffset(22, 22),
+                ZIndex = plcHdr.ZIndex + 1,
+                Parent = fr,
+            })
+            Library:ApplyLucideIcon(dkBtn, poi)
+            dkBtn.MouseButton1Click:Connect(function()
+                bx:SetPoppedOut(false)
+            end)
+        end
+
+        return fr
+    end
+
+    function bx:RefreshPopOutPlaceholder()
+        if not bx.PoppedOut or not plc or not hdr then return end
+        if plcHdr then
+            plcHdr:Destroy()
+            plcHdr = nil
+        end
+        plcHdr = hdr:Clone()
+        plcHdr.Parent = plc
+        DimPopOutClone(plcHdr)
+    end
+
+    function bx:SetPoppedOut(v: boolean, fPos: UDim2?)
+        if not bx.PopOutEnabled or bx.Destroyed then return end
+        v = v == true
+        if bx.PoppedOut == v then
+            if v and fPos and flt then flt.Position = fPos end
             return
         end
 
-        StartPos = Input.Position
-        FramePos = UI.Position
-        Dragging = true
+        if v then
+            if opts.Before then opts.Before() end
+            local bCh = if opts.Children then opts.Children() else { hld }
+            hCh = {}
+            table.clear(oPar)
+            table.clear(oOrd)
 
-        Changed = Input.Changed:Connect(function()
-            if Input.UserInputState ~= Enum.UserInputState.End then
-                return
+            for _, ch in bCh do
+                if not ch or not ch.Parent then continue end
+                table.insert(hCh, ch)
+                oPar[ch] = ch.Parent
+                oOrd[ch] = ch.LayoutOrder
             end
 
-            Dragging = false
-            if Changed and Changed.Connected then
-                Changed:Disconnect()
-                Changed = nil
+            if #hCh == 0 then return end
+            local w = hld.AbsoluteSize.X / Library.DPIScale
+            if w < 50 then w = 200 end
+
+            local aPos = hld.AbsolutePosition
+            plc = createPlc()
+            bx.PopOutPlaceholder = plc
+
+            flt = New("Frame", {
+                Active = true,
+                AutomaticSize = Enum.AutomaticSize.Y,
+                BackgroundTransparency = 1,
+                Position = fPos or UDim2.fromOffset(aPos.X / Library.DPIScale, aPos.Y / Library.DPIScale),
+                Size = UDim2.fromOffset(w, 0),
+                ZIndex = 1,
+                Parent = Library.Floats,
+            })
+            fltSc = New("UIScale", { Parent = flt })
+            table.insert(Library.Scales, fltSc)
+            fltSc.Scale = Library.DPIScale - (tonumber(Library.ScalesOffset[fltSc]) or 0)
+
+            New("UIListLayout", { Padding = UDim.new(0, 6), Parent = flt })
+            for _, ch in hCh do ch.Parent = flt end
+
+            if not table.find(Library.DraggableElements, flt) then
+                table.insert(Library.DraggableElements, flt)
+            end
+
+            bx.PopOutFloat = flt
+            bx.PoppedOut = true
+            SyncPopOutVisibility(bx)
+            raiseFlt()
+
+            flt:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+                bx:Resize()
+            end)
+
+            if opts.After then opts.After() end
+            return
+        end
+
+        if flt then
+            local dIdx = table.find(Library.DraggableElements, flt)
+            if dIdx then table.remove(Library.DraggableElements, dIdx) end
+        end
+
+        if fltSc then
+            local sIdx = table.find(Library.Scales, fltSc)
+            if sIdx then table.remove(Library.Scales, sIdx) end
+            fltSc = nil
+        end
+
+        for _, ch in hCh do
+            if not ch or not ch.Parent then continue end
+            ch.Parent = oPar[ch] or bh
+            ch.LayoutOrder = oOrd[ch] or 0
+        end
+
+        if plc then plc:Destroy() plc = nil end
+        plcHdr = nil
+
+        if flt then flt:Destroy() flt = nil end
+
+        bx.PopOutFloat = nil
+        bx.PopOutPlaceholder = nil
+        bx.PoppedOut = false
+        table.clear(hCh)
+        table.clear(oPar)
+        table.clear(oOrd)
+
+        if opts.After then opts.After() end
+    end
+
+    function bx:TogglePoppedOut()
+        bx:SetPoppedOut(not bx.PoppedOut)
+    end
+
+    local function stopDrag()
+        if dSt == "Idle" then return end
+        local wasDrg = dSt == "Dragging"
+        local didMv = dMov
+        dSt = "Idle"
+        dIn, pMs, dSp = nil, nil, nil
+        dMov = false
+
+        if dChg and dChg.Connected then
+            dChg:Disconnect()
+            dChg = nil
+        end
+
+        if not wasDrg or not bx.PoppedOut or not flt then return end
+        local fCtr = flt.AbsolutePosition + (flt.AbsoluteSize * 0.5)
+        local nrPlc = false
+        if Library.Toggled and plc and plc.Parent then
+            local pCtr = plc.AbsolutePosition + (plc.AbsoluteSize * 0.5)
+            nrPlc = (fCtr - pCtr).Magnitude <= (Library.PopOutSnapDistance or 80)
+        end
+
+        if nrPlc or (didMv and not IsScreenPointOutsideMain(fCtr)) then
+            bx:SetPoppedOut(false)
+        end
+    end
+
+    local function beginDrag(inp: InputObject)
+        if dSt ~= "Idle" or bx.Destroyed or not (ScreenGui and ScreenGui.Parent) then return end
+        local pt = Vector2.new(inp.Position.X, inp.Position.Y)
+        local top = GetTopFloatAt(pt)
+
+        if bx.PoppedOut then
+            if not flt or top ~= flt then return end
+        elseif top ~= nil and not hdr:IsDescendantOf(top) then
+            return
+        end
+
+        dSt = "Holding"
+        dIn = inp
+        pMs = pt
+        dSp = nil
+        dMov = false
+
+        if bx.PoppedOut and flt then raiseFlt() end
+
+        dChg = inp.Changed:Connect(function()
+            if inp.UserInputState == Enum.UserInputState.End then
+                stopDrag()
+            end
+        end)
+
+        task.delay(Library.PopOutHoldTime or 0.15, function()
+            if dSt ~= "Holding" or dIn ~= inp then return end
+            dSt = "Dragging"
+            if bx.PoppedOut and flt then
+                raiseFlt()
+                dSp = flt.Position
+            end
+        end)
+    end
+
+    local function updateDrag(inp: InputObject)
+        if dSt ~= "Dragging" or not pMs then return end
+        if not (ScreenGui and ScreenGui.Parent) then
+            stopDrag()
+            return
+        end
+
+        local mPos = Vector2.new(inp.Position.X, inp.Position.Y)
+        local dlt = mPos - pMs
+
+        if not bx.PoppedOut then
+            if dlt.Magnitude < (Library.PopOutDragThreshold or 8) then return end
+            bx:SetPoppedOut(true)
+            if not flt then return end
+            raiseFlt()
+            dSp = flt.Position
+            dMov = true
+        elseif dlt.Magnitude >= (Library.PopOutDragThreshold or 8) then
+            dMov = true
+        end
+
+        if flt and dSp then
+            flt.Position = UDim2.new(dSp.X.Scale, dSp.X.Offset + dlt.X, dSp.Y.Scale, dSp.Y.Offset + dlt.Y)
+        end
+    end
+
+    local function bindSource(gui: GuiObject)
+        Library:GiveSignal(gui.InputBegan:Connect(function(inp: InputObject)
+            if IsClickInput(inp) then beginDrag(inp) end
+        end))
+    end
+
+    bindSource(hdr)
+    for _, d in hdr:QueryDescendants("GuiObject:not(ImageButton)") do
+        bindSource(d)
+    end
+    Library:GiveSignal(hdr.DescendantAdded:Connect(function(d)
+        if d:IsA("GuiObject") and not d:IsA("ImageButton") then
+            bindSource(d)
+        end
+    end))
+    Library:GiveSignal(UserInputService.InputChanged:Connect(function(inp: InputObject)
+        if IsHoverInput(inp) then updateDrag(inp) end
+    end))
+end
+
+function Library:MakeDraggable(
+    ui: GuiObject,
+    df: GuiObject,
+    it: boolean?,
+    imw: boolean?,
+    sc: { Enabled: boolean, Distance: number?, Margin: number?, AvoidCoreGui: boolean? }?
+)
+    local sp, fp
+    local drg = false
+    local chg, ib, ic
+    local sgX, sgY
+
+    local function gSG()
+        if not sgX then
+            sgX = New("Frame", {
+                BackgroundColor3 = "AccentColor",
+                BackgroundTransparency = 0.25,
+                BorderSizePixel = 0,
+                AnchorPoint = Vector2.new(0.5, 0),
+                Size = UDim2.new(0, 2, 1, 0),
+                Visible = false,
+                ZIndex = 10000,
+                Parent = ScreenGui,
+            })
+        end
+        if not sgY then
+            sgY = New("Frame", {
+                BackgroundColor3 = "AccentColor",
+                BackgroundTransparency = 0.25,
+                BorderSizePixel = 0,
+                AnchorPoint = Vector2.new(0, 0.5),
+                Size = UDim2.new(1, 0, 0, 2),
+                Visible = false,
+                ZIndex = 10000,
+                Parent = ScreenGui,
+            })
+        end
+        return sgX, sgY
+    end
+
+    local function hSG()
+        if sgX then sgX.Visible = false end
+        if sgY then sgY.Visible = false end
+    end
+
+    ib = df.InputBegan:Connect(function(inp: InputObject)
+        if not IsClickInput(inp) or (imw and Library.CantDragForced) then return end
+        sp = inp.Position
+        fp = ui.Position
+        drg = true
+
+        chg = inp.Changed:Connect(function()
+            if inp.UserInputState ~= Enum.UserInputState.End then return end
+            drg = false
+            hSG()
+            if chg and chg.Connected then
+                chg:Disconnect()
+                chg = nil
             end
         end)
     end)
 
-    InputChanged = UserInputService.InputChanged:Connect(function(Input: InputObject)
-        if
-            (not IgnoreToggled and not Library.Toggled)
-            or (IsMainWindow and Library.CantDragForced)
-            or not (ScreenGui and ScreenGui.Parent)
-        then
-            Dragging = false
-            if Changed and Changed.Connected then
-                Changed:Disconnect()
-                Changed = nil
+    ic = UserInputService.InputChanged:Connect(function(inp: InputObject)
+        if (not it and not Library.Toggled) or (imw and Library.CantDragForced) or not (ScreenGui and ScreenGui.Parent) then
+            drg = false
+            hSG()
+            if chg and chg.Connected then
+                chg:Disconnect()
+                chg = nil
             end
-
             return
         end
 
-        if Dragging and IsHoverInput(Input) then
-            local Delta = Input.Position - StartPos
-            UI.Position =
-                UDim2.new(FramePos.X.Scale, FramePos.X.Offset + Delta.X, FramePos.Y.Scale, FramePos.Y.Offset + Delta.Y)
+        if drg and IsHoverInput(inp) then
+            local dlt = inp.Position - sp
+            local nX = fp.X.Offset + dlt.X
+            local nY = fp.Y.Offset + dlt.Y
+
+            if sc and sc.Enabled then
+                local cam = workspace.CurrentCamera
+                local vp = cam and cam.ViewportSize or Vector2.new(1920, 1080)
+                local dst = sc.Distance or 28
+                local mg = sc.Margin or 8
+
+                local aX = fp.X.Scale * vp.X + nX
+                local aY = fp.Y.Scale * vp.Y + nY
+
+                local es = ui.AbsoluteSize
+                local tgX, tgY = GetSnapEdges(es, vp, mg, sc.AvoidCoreGui ~= false)
+                local snX, snXN = GetClosestSnapTarget(aX, tgX, dst)
+                local snY, snYN = GetClosestSnapTarget(aY, tgY, dst)
+
+                if snX then nX = snX - fp.X.Scale * vp.X end
+                if snY then nY = snY - fp.Y.Scale * vp.Y end
+
+                local gX, gY = gSG()
+                gX.Visible = snX ~= nil
+                if snX then
+                    gX.Position = UDim2.fromOffset(GetSnapGuideOffset(snXN, snX, es.X), 0)
+                end
+                gY.Visible = snY ~= nil
+                if snY then
+                    gY.Position = UDim2.fromOffset(0, GetSnapGuideOffset(snYN, snY, es.Y))
+                end
+            end
+
+            ui.Position = UDim2.new(fp.X.Scale, nX, fp.Y.Scale, nY)
         end
     end)
 
-    Library:GiveSignal(InputChanged)
-    Library:GiveSignal(InputBegan)
-    
-    UI.Destroying:Once(function()
-        if InputChanged and InputChanged.Connected then
-            InputChanged:Disconnect()
-        end
+    Library:GiveSignal(ic)
+    Library:GiveSignal(ib)
 
-        if InputBegan and InputBegan.Connected then
-            InputBegan:Disconnect()
-        end
-
-        if Changed and Changed.Connected then
-            Changed:Disconnect()
-        end
-
-        local IdxChanged = table.find(Library.Signals, InputChanged)
-        if IdxChanged then
-            table.remove(Library.Signals, IdxChanged)
-        end
-
-        local IdxBegan = table.find(Library.Signals, InputBegan)
-        if IdxBegan then
-            table.remove(Library.Signals, IdxBegan)
-        end
+    ui.Destroying:Once(function()
+        if ic and ic.Connected then ic:Disconnect() end
+        if ib and ib.Connected then ib:Disconnect() end
+        if chg and chg.Connected then chg:Disconnect() end
+        if sgX then sgX:Destroy() end
+        if sgY then sgY:Destroy() end
+        local idc = table.find(Library.Signals, ic)
+        if idc then table.remove(Library.Signals, idc) end
+        local idb = table.find(Library.Signals, ib)
+        if idb then table.remove(Library.Signals, idb) end
     end)
 end
 
@@ -2368,13 +2540,21 @@ function Library:PlayTabAnimation(TabCanvas: CanvasGroup, Showing: boolean, OnCo
         local SwipeFrom = string.lower(Library.TabSwipeFrom or "bottom")
         local StartPosition
 
-        if SwipeFrom == "left" then
+        if SwipeFrom == "auto" and Library.PreviousTab and Tab.Button and Library.PreviousTab.Button then
+            local curOrd = Tab.Button.LayoutOrder or 0
+            local prevOrd = Library.PreviousTab.Button.LayoutOrder or 0
+            if curOrd > prevOrd then
+                StartPosition = UDim2.fromOffset(0, Offset)
+            else
+                StartPosition = UDim2.fromOffset(0, -Offset)
+            end
+        elseif SwipeFrom == "left" then
             StartPosition = UDim2.fromOffset(-Offset, 0)
         elseif SwipeFrom == "top" then
             StartPosition = UDim2.fromOffset(0, -Offset)
         elseif SwipeFrom == "right" then
             StartPosition = UDim2.fromOffset(Offset, 0)
-        else -- bottom (Default)
+        else
             StartPosition = UDim2.fromOffset(0, Offset)
         end
 
@@ -2490,8 +2670,8 @@ function Library:AddDraggableLabel(...)
         Position = UDim2.fromOffset(6, 6),
         Text = Text,
         TextSize = 15,
-        ZIndex = 10,
-        Parent = ScreenGui,
+        ZIndex = 1,
+        Parent = Floats,
     })
 
     table.insert(
@@ -2631,8 +2811,8 @@ function Library:AddDraggableButton(...)
         BackgroundColor3 = "BackgroundColor",
         Position = UDim2.fromOffset(6, 6),
         TextSize = 16,
-        ZIndex = 10,
-        Parent = ScreenGui,
+        ZIndex = 1,
+        Parent = Floats,
     })
     table.insert(
         Library.Corners, 
@@ -2724,8 +2904,8 @@ function Library:AddDraggableMenu(Name: string)
         BackgroundColor3 = "BackgroundColor",
         Position = UDim2.fromOffset(6, 6),
         Size = UDim2.fromOffset(0, 0),
-        ZIndex = 10,
-        Parent = ScreenGui,
+        ZIndex = 1,
+        Parent = Floats,
     })
     table.insert(
         Library.Corners,
@@ -2820,8 +3000,8 @@ function Library:AddDraggableImageButton(...)
         Position = UDim2.fromOffset(6, 6),
         Size = UDim2.fromOffset(IconSize + 12, IconSize + 12),
         Text = "",
-        ZIndex = 10,
-        Parent = ScreenGui,
+        ZIndex = 1,
+        Parent = Floats,
     })
     
     local IconImage = New("ImageLabel", {
@@ -2938,10 +3118,10 @@ function Library:AddContextMenu(
     anim: ("Dropdown" | "KeyPicker" | "none")?
 )
     local m
-    local pG = h:FindFirstAncestorOfClass("ScreenGui")
-    local mZ = math.max(10, h.ZIndex + 1)
-    if pG ~= ScreenGui and (Library.ActiveLoading and pG ~= Library.ActiveLoading.ScreenGui) then
-        pG = ScreenGui
+    local hG = h:FindFirstAncestorOfClass("ScreenGui")
+    local pG = Overlay
+    if hG and hG ~= ScreenGui and Library.ActiveLoading and hG == Library.ActiveLoading.ScreenGui then
+        pG = hG
     end
 
     if lst then
@@ -2956,7 +3136,7 @@ function Library:AddContextMenu(
             Size = typeof(sz) == "function" and sz() or sz,
             TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png",
             Visible = false,
-            ZIndex = mZ,
+            ZIndex = 1,
             Parent = pG,
         })
     else
@@ -2964,7 +3144,7 @@ function Library:AddContextMenu(
             BackgroundColor3 = "BackgroundColor",
             Size = typeof(sz) == "function" and sz() or sz,
             Visible = false,
-            ZIndex = mZ,
+            ZIndex = 1,
             Parent = pG,
         })
     end
@@ -2981,46 +3161,46 @@ function Library:AddContextMenu(
         Parent = m,
     })
 
-    local c
+    local cr
     if noCr ~= true then
         local r = Library.CornerRadius / 2
         if spCr == "top" then
-            c = New("UICorner", {
+            cr = New("UICorner", {
                 TopLeftRadius = UDim.new(0, r),
                 TopRightRadius = UDim.new(0, r),
                 BottomRightRadius = UDim.new(0, 0),
                 BottomLeftRadius = UDim.new(0, 0),
                 Parent = m,
-            }); table.insert(Library.SpecificCorners, c)
+            }); table.insert(Library.SpecificCorners, cr)
         elseif spCr == "bottom" then
-            c = New("UICorner", {
+            cr = New("UICorner", {
                 TopLeftRadius = UDim.new(0, 0),
                 TopRightRadius = UDim.new(0, 0),
                 BottomRightRadius = UDim.new(0, r),
                 BottomLeftRadius = UDim.new(0, r),
                 Parent = m,
-            }); table.insert(Library.SpecificCorners, c)
+            }); table.insert(Library.SpecificCorners, cr)
         elseif spCr == "no_left" then
-            c = New("UICorner", {
+            cr = New("UICorner", {
                 TopLeftRadius = UDim.new(0, 0),
                 TopRightRadius = UDim.new(0, r),
                 BottomRightRadius = UDim.new(0, r),
                 BottomLeftRadius = UDim.new(0, 0),
                 Parent = m,
-            }); table.insert(Library.SpecificCorners, c)
+            }); table.insert(Library.SpecificCorners, cr)
         elseif spCr == "no_top_left" then
-            c = New("UICorner", {
+            cr = New("UICorner", {
                 TopLeftRadius = UDim.new(0, 0),
                 TopRightRadius = UDim.new(0, r),
                 BottomRightRadius = UDim.new(0, r),
                 BottomLeftRadius = UDim.new(0, r),
                 Parent = m,
-            }); table.insert(Library.SpecificCorners, c)
+            }); table.insert(Library.SpecificCorners, cr)
         else
-            c = New("UICorner", {
+            cr = New("UICorner", {
                 CornerRadius = UDim.new(0, r),
                 Parent = m,
-            }); table.insert(Library.Corners, c)
+            }); table.insert(Library.Corners, cr)
         end
     end
 
@@ -3028,8 +3208,10 @@ function Library:AddContextMenu(
         Connections = {},
         Destroyed = false,
         Active = false,
+        ActiveCallback = cb,
         Holder = h,
         Menu = m,
+        Corner = cr,
         List = nil,
         Signal = nil,
         Size = sz,
@@ -3057,6 +3239,11 @@ function Library:AddContextMenu(
 
         CurrentMenu = t
         t.Active = true
+        m.ZIndex = 1
+
+        local tgP = if pG == Overlay then Overlay else pG
+        m.Parent = nil
+        m.Parent = tgP
 
         local oPos = typeof(off) == "function" and off() or off
         m.Position = UDim2.fromOffset(
@@ -3114,7 +3301,17 @@ function Library:AddContextMenu(
                 math.floor(h.AbsolutePosition.Y + cPos[2])
             )
 
-            if not Library:IsInsideFrame(Library.WindowContainer, h) and t.Active then
+            local hAllowed = Library:IsInsideFrame(Library.WindowContainer, h)
+            if not hAllowed then
+                for _, srf in Library.DraggableElements do
+                    if srf and Library:IsInsideFrame(srf, h) then
+                        hAllowed = true
+                        break
+                    end
+                end
+            end
+
+            if not hAllowed and t.Active then
                 t:Close()
             end
         end)
@@ -3195,11 +3392,17 @@ function Library:AddContextMenu(
             t.OpenCloseTween = nil
         end
 
+        local mIdx = table.find(Library.ContextMenus, t)
+        if mIdx then
+            table.remove(Library.ContextMenus, mIdx)
+        end
+
         if m then
             m:Destroy()
         end
     end
 
+    table.insert(Library.ContextMenus, t)
     return t
 end
 
@@ -11316,12 +11519,19 @@ function Library:CreateWindow(WindowInfo)
             MainFrame.Position = UDim2.new(0.5, -MainFrame.Size.X.Offset / 2, 0.5, -MainFrame.Size.Y.Offset / 2)
         end
 
+        local WindowSnapConfig = {
+            Enabled = WindowInfo.Snapping,
+            Distance = WindowInfo.SnapDistance,
+            Margin = WindowInfo.SnapMargin,
+            AvoidCoreGui = WindowInfo.SnapAvoidCoreGui,
+        }
+
         TopBar = New("Frame", {
             BackgroundTransparency = 1,
             Size = UDim2.new(1, 0, 0, 48),
             Parent = MainFrame,
         })
-        Library:MakeDraggable(MainFrame, TopBar, false, true)
+        Library:MakeDraggable(MainFrame, TopBar, false, true, WindowSnapConfig)
 
         TitleHolder = New("Frame", {
             BackgroundTransparency = 1,
@@ -12471,6 +12681,26 @@ function Library:CreateWindow(WindowInfo)
                 SetAlwaysOnTop(Library.ScreenGui, WindowInfo.AlwaysOnTop)
             end
 
+            function Window:SetSnapping(en: boolean, dst: number?, mg: number?, acg: boolean?)
+                WindowInfo.Snapping = en == true
+                WindowSnapConfig.Enabled = WindowInfo.Snapping
+
+                if dst then
+                    WindowInfo.SnapDistance = math.max(0, dst)
+                    WindowSnapConfig.Distance = WindowInfo.SnapDistance
+                end
+
+                if mg then
+                    WindowInfo.SnapMargin = math.max(0, mg)
+                    WindowSnapConfig.Margin = WindowInfo.SnapMargin
+                end
+
+                if acg ~= nil then
+                    WindowInfo.SnapAvoidCoreGui = acg == true
+                    WindowSnapConfig.AvoidCoreGui = WindowInfo.SnapAvoidCoreGui
+                end
+            end
+
             function Window:SetCornerRadius(r)
                 assert(typeof(r) == "number", "Expected number for Radius got: " .. typeof(r))
                 r = math.min(r, 20)
@@ -12480,7 +12710,7 @@ function Library:CreateWindow(WindowInfo)
                 local hc = Library.CornerRadius / 2
 
                 for _, c in Library.Corners do
-                    if c.CornerRadius.Offset == hc then
+                    if math.abs(c.CornerRadius.Offset - hc) < 0.001 then
                         c.CornerRadius = rh
                     else
                         c.CornerRadius = ru
@@ -12503,6 +12733,34 @@ function Library:CreateWindow(WindowInfo)
 
                 ResizeButton.Position = UDim2.new(1, -r / 4, 0, 0)
                 BottomBackground.Size = UDim2.new(1, 0, 0, 20 + r)
+
+                for _, cm in Library.ContextMenus do
+                    if cm.Destroyed or typeof(cm.ActiveCallback) ~= "function" then
+                        continue
+                    end
+
+                    if not cm.Active then
+                        local hAct = false
+                        for _, oth in Library.ContextMenus do
+                            if oth ~= cm and oth.Active and oth.Holder == cm.Holder then
+                                hAct = true
+                                break
+                            end
+                        end
+                        if not hAct then
+                            cm.ActiveCallback(false)
+                        end
+                        continue
+                    end
+
+                    cm.ActiveCallback(true)
+                end
+
+                for _, opt in Options do
+                    if opt.Type == "Dropdown" and opt.RefreshPool then
+                        opt:RefreshPool()
+                    end
+                end
 
                 for _, t in Library.Tabs do
                     if t.IsKeyTab then
@@ -13195,86 +13453,73 @@ function Library:CreateWindow(WindowInfo)
 
                 local function AddTabbox(self, Info)
                     local ParentObj = self
-
                     if typeof(Info) == "string" or Info == nil then
                         Info = { Name = Info }
+                    end
+                    Info = Library:Validate(Info, Templates.Tabbox)
+
+                    local s = Info.Side or 1
+                    if typeof(s) == "string" then
+                        local sl = s:lower()
+                        s = (sl == "right" and 2) or 1
                     end
 
                     local BoxHolder = New("Frame", {
                         AutomaticSize = Enum.AutomaticSize.Y,
                         BackgroundTransparency = 1,
                         Size = UDim2.fromScale(1, 0),
-                        Parent = if ParentObj.Type == "Groupbox" then ParentObj.Container else ((Info and Info.Side == 1) and TabLeft or TabRight),
+                        Parent = if ParentObj.Type == "Groupbox" then ParentObj.Container else (s == 2 and TabRight or TabLeft),
+                    })
+                    New("UIListLayout", { Padding = UDim.new(0, 6), Parent = BoxHolder })
+                    New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = BoxHolder })
+
+                    local TabboxHolder = New("Frame", {
+                        BackgroundColor3 = "BackgroundColor",
+                        Size = UDim2.fromScale(1, 0),
+                        Parent = BoxHolder,
+                    })
+                    table.insert(Library.Corners, New("UICorner", { CornerRadius = UDim.new(0, WindowInfo.CornerRadius), Parent = TabboxHolder }))
+                    Library:AddOutline(TabboxHolder)
+
+                    local TabboxButtons = New("Frame", {
+                        BackgroundTransparency = 1,
+                        Size = UDim2.new(1, 0, 0, 34),
+                        Parent = TabboxHolder,
                     })
                     New("UIListLayout", {
-                        Padding = UDim.new(0, 6),
-                        Parent = BoxHolder,
+                        FillDirection = Enum.FillDirection.Horizontal,
+                        HorizontalFlex = Enum.UIFlexAlignment.Fill,
+                        Parent = TabboxButtons,
                     })
-                    New("UIPadding", {
-                        PaddingBottom = UDim.new(0, 4),
-                        PaddingTop = UDim.new(0, 4),
-                        Parent = BoxHolder,
-                    })
-
-                    local TabboxHolder
-                    local TabboxButtons
-
-                    do
-                        TabboxHolder = New("Frame", {
-                            BackgroundColor3 = "BackgroundColor",
-                            Size = UDim2.fromScale(1, 0),
-                            Parent = BoxHolder,
-                        })
-                        table.insert(
-                            Library.Corners,
-                            New("UICorner", {
-                                CornerRadius = UDim.new(0, WindowInfo.CornerRadius),
-                                Parent = TabboxHolder,
-                            })
-                        )
-                        Library:AddOutline(TabboxHolder)
-
-                        TabboxButtons = New("Frame", {
-                            BackgroundTransparency = 1,
-                            Size = UDim2.new(1, 0, 0, 34),
-                            Parent = TabboxHolder,
-                        })
-                        New("UIListLayout", {
-                            FillDirection = Enum.FillDirection.Horizontal,
-                            HorizontalFlex = Enum.UIFlexAlignment.Fill,
-                            Parent = TabboxButtons,
-                        })
-                    end
 
                     local TotalTabs = 0
-                    local FirstTab
-                    local LastTab
+                    local FirstTab, LastTab
 
                     local Tabbox = {
+                        Type = "Tabbox",
                         Connections = {},
                         Destroyed = false,
-
+                        Visible = true,
                         ActiveTab = nil,
-
                         BoxHolder = BoxHolder,
                         Holder = TabboxHolder,
-                        Tabs = {}
+                        Tabs = {},
+                        ParentBox = if ParentObj.Type == "Groupbox" then ParentObj else nil,
                     }
 
                     function Tabbox:UpdateCorners()
-                        for _, Tab in Tabbox.Tabs do
-                            Tab:UpdateCorners()
-                        end
+                        for _, tb in Tabbox.Tabs do tb:UpdateCorners() end
+                    end
+
+                    function Tabbox:Resize()
+                        if Tabbox.ActiveTab then Tabbox.ActiveTab:Resize() end
                     end
 
                     function Tabbox:AddTab(Name, IconName)
-                        TotalTabs = TotalTabs + 1
+                        TotalTabs += 1
                         local TabIndex = TotalTabs
-
                         LastTab = TabIndex
-                        if not FirstTab then
-                            FirstTab = TabIndex
-                        end
+                        if not FirstTab then FirstTab = TabIndex end
 
                         local IsNameEmpty = Name == nil or Trim(tostring(Name)) == ""
                         local TabStoringIndex = IsNameEmpty and tostring(TabIndex) or Name
@@ -13293,7 +13538,8 @@ function Library:CreateWindow(WindowInfo)
                             BottomRightRadius = UDim.new(0, 0),
                             BottomLeftRadius = UDim.new(0, 0),
                             Parent = Button,
-                        }); table.insert(Library.SpecificCorners, ButtonCorner)
+                        })
+                        table.insert(Library.SpecificCorners, ButtonCorner)
 
                         local ButtonContent = New("Frame", {
                             AnchorPoint = Vector2.new(0.5, 0.5),
@@ -13311,18 +13557,17 @@ function Library:CreateWindow(WindowInfo)
                             Parent = ButtonContent,
                         })
 
-                        local ButtonIcon                
+                        local ButtonIcon
                         local BoxIcon = Library:GetCustomIcon(IconName)
                         if BoxIcon then
                             ButtonIcon = New("ImageLabel", {
-                                Image = BoxIcon.Url,
+                                BackgroundTransparency = 1,
                                 ImageColor3 = BoxIcon.Custom and "WhiteColor" or "AccentColor",
-                                ImageRectOffset = BoxIcon.ImageRectOffset,
-                                ImageRectSize = BoxIcon.ImageRectSize,
                                 ImageTransparency = 0.5,
                                 Size = IsNameEmpty and UDim2.fromOffset(16, 16) or UDim2.fromOffset(18, 18),
                                 Parent = ButtonContent,
                             })
+                            Library:ApplyLucideIcon(ButtonIcon, BoxIcon)
                         end
 
                         local ButtonLabel
@@ -13344,150 +13589,107 @@ function Library:CreateWindow(WindowInfo)
                             Size = UDim2.new(1, 0, 0, 1),
                         })
 
-                        local Container = New("Frame", {
+                        local Container = New("ScrollingFrame", {
+                            AutomaticCanvasSize = Enum.AutomaticSize.Y,
                             BackgroundTransparency = 1,
+                            BorderSizePixel = 0,
+                            CanvasSize = UDim2.fromScale(0, 0),
                             Position = UDim2.fromOffset(0, 35),
+                            ScrollBarThickness = 0,
                             Size = UDim2.new(1, 0, 1, -35),
                             Visible = false,
                             Parent = TabboxHolder,
                         })
-                        local List = New("UIListLayout", {
-                            Padding = UDim.new(0, 8),
-                            Parent = Container,
-                        })
-                        New("UIPadding", {
-                            PaddingBottom = UDim.new(0, 7),
-                            PaddingLeft = UDim.new(0, 7),
-                            PaddingRight = UDim.new(0, 7),
-                            PaddingTop = UDim.new(0, 7),
-                            Parent = Container,
-                        })
+                        local List = New("UIListLayout", { Padding = UDim.new(0, 8), Parent = Container })
+                        New("UIPadding", { PaddingBottom = UDim.new(0, 7), PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7), PaddingTop = UDim.new(0, 7), Parent = Container })
 
-                        local Tab = {
+                        local subTab = {
+                            Name = Name,
                             Connections = {},
                             Destroyed = false,
-
                             ButtonHolder = Button,
                             Container = Container,
                             ButtonCorner = ButtonCorner,
-
                             Tab = Tab,
+                            Tabbox = Tabbox,
                             Elements = {},
                             DependencyBoxes = {},
                         }
 
-                        function Tab:Show()
-                            if Tabbox.ActiveTab then
-                                Tabbox.ActiveTab:Hide()
-                            end
-
+                        function subTab:Show()
+                            if Tabbox.ActiveTab then Tabbox.ActiveTab:Hide() end
                             Button.BackgroundTransparency = 1
-
-                            if ButtonLabel then
-                                ButtonLabel.TextTransparency = 0
-                            end
-                            if ButtonIcon then
-                                ButtonIcon.ImageTransparency = 0
-                            end
-
+                            if ButtonLabel then ButtonLabel.TextTransparency = 0 end
+                            if ButtonIcon then ButtonIcon.ImageTransparency = 0 end
                             Line.Visible = false
-
                             Container.Visible = true
-
-                            Tabbox.ActiveTab = Tab
-                            Tab:Resize()
+                            Tabbox.ActiveTab = subTab
+                            subTab:Resize()
+                            Tabbox:RefreshPopOutPlaceholder()
                         end
 
-                        function Tab:Hide()
+                        function subTab:Hide()
                             Button.BackgroundTransparency = 0
-
-                            if ButtonLabel then
-                                ButtonLabel.TextTransparency = 0.5
-                            end
-                            if ButtonIcon then
-                                ButtonIcon.ImageTransparency = 0.5
-                            end
+                            if ButtonLabel then ButtonLabel.TextTransparency = 0.5 end
+                            if ButtonIcon then ButtonIcon.ImageTransparency = 0.5 end
                             Line.Visible = true
                             Container.Visible = false
-
                             Tabbox.ActiveTab = nil
                         end
 
-                        function Tab:Resize()
-                            if Tabbox.ActiveTab ~= Tab then
-                                return
+                        function subTab:Resize()
+                            if Tabbox.ActiveTab ~= subTab then return end
+                            local cSize = (List.AbsoluteContentSize.Y / Library.DPIScale) + 14
+                            if Tabbox.PoppedOut then
+                                cSize = math.min(cSize, GetPopOutBodyMaxHeight(Tabbox, 35))
                             end
-
-                            TabboxHolder.Size = UDim2.new(1, 0, 0, (List.AbsoluteContentSize.Y / Library.DPIScale) + 49)
-                            if ParentObj.Type == "Groupbox" then
-                                ParentObj:Resize()
-                            end
+                            TabboxHolder.Size = UDim2.new(1, 0, 0, cSize + 35)
+                            if ParentObj.Type == "Groupbox" then ParentObj:Resize() end
                         end
 
-                        function Tab:UpdateCorners()
-                            local Radius = WindowInfo.CornerRadius
-
-                            ButtonCorner.TopLeftRadius = UDim.new(0, TabIndex == FirstTab and Radius or 0)
-                            ButtonCorner.TopRightRadius = UDim.new(0, TabIndex == LastTab and Radius or 0)
+                        function subTab:UpdateCorners()
+                            local r = WindowInfo.CornerRadius
+                            ButtonCorner.TopLeftRadius = UDim.new(0, TabIndex == FirstTab and r or 0)
+                            ButtonCorner.TopRightRadius = UDim.new(0, TabIndex == LastTab and r or 0)
                         end
 
-                        function Tab:Destroy()
-                            if TabCanvas then
-                                TabCanvas:Destroy()
-                            elseif TabContainer then
-                                TabContainer:Destroy()
-                            end
-
-                            if TabButton then
-                                for Index, Entry in Library.TabButtons do
-                                    if typeof(Entry) == "table" and Entry.Button == TabButton then
-                                        table.remove(Library.TabButtons, Index)
-                                        break
-                                    end
-                                end
-                                
-                                TabButton:Destroy()
-                            end
-                            
-                            Library.Tabs[Name] = nil
+                        function subTab:Destroy()
+                            subTab.Destroyed = true
+                            for _, cn in subTab.Connections do cn:Disconnect() end
+                            for _, el in subTab.Elements do if el.Destroy then el:Destroy() end end
+                            for _, sdb in subTab.DependencyBoxes do if sdb.Destroy then sdb:Destroy() end end
+                            if Container then Container:Destroy() end
+                            if Button then Button:Destroy() end
                         end
 
-                        if not Tabbox.ActiveTab then
-                            Tab:Show()
-                        end
+                        if not Tabbox.ActiveTab then subTab:Show() end
+                        Button.MouseButton1Click:Connect(subTab.Show)
+                        setmetatable(subTab, BaseGroupbox)
 
-                        Button.MouseButton1Click:Connect(Tab.Show)
-
-                        setmetatable(Tab, BaseGroupbox)
-
-                        Tabbox.Tabs[TabStoringIndex] = Tab
+                        Tabbox.Tabs[TabStoringIndex] = subTab
                         Tabbox:UpdateCorners()
-
-                        return Tab, TabStoringIndex
+                        return subTab, TabStoringIndex
                     end
 
+                    Library:MakeBoxPopOut(Tabbox, {
+                        Enabled = Info.PopOut ~= false,
+                        Header = TabboxButtons,
+                        Children = function()
+                            return { TabboxHolder }
+                        end,
+                        After = function()
+                            if Tabbox.ActiveTab then Tabbox.ActiveTab:Resize() end
+                            if ParentObj.Type == "Groupbox" then ParentObj:Resize() end
+                        end,
+                    })
+
                     function Tabbox:Destroy()
+                        if Tabbox.PoppedOut then Tabbox:SetPoppedOut(false) end
                         Tabbox.Destroyed = true
-
-                        if Tabbox.Connections then
-                            for _, Connection in Tabbox.Connections do
-                                Connection:Disconnect()
-                            end
-                        end
-
-                        for _, Tab in Tabbox.Tabs do
-                            if Tab.Destroy then
-                                Tab:Destroy()
-                            end
-                        end
-
-                        if TabboxHolder then
-                            TabboxHolder:Destroy()
-                        end
-
-                        if BoxHolder then
-                            BoxHolder:Destroy()
-                        end
+                        for _, cn in Tabbox.Connections do cn:Disconnect() end
+                        for _, tb in Tabbox.Tabs do if tb.Destroy then tb:Destroy() end end
+                        if TabboxHolder then TabboxHolder:Destroy() end
+                        if BoxHolder then BoxHolder:Destroy() end
                     end
 
                     if Info.Name then
@@ -13520,6 +13722,8 @@ function Library:CreateWindow(WindowInfo)
 
                 function Tab:AddGroupbox(i)
                     local o = self or Tab
+                    i = Library:Validate(i, Templates.Groupbox)
+
                     local s = i.Side or 1
                     local tSide = o.Sides[1]
                     if typeof(s) == "string" then
@@ -13563,23 +13767,22 @@ function Library:CreateWindow(WindowInfo)
 
                     local bi = Library:GetCustomIcon(i.IconName)
                     if bi then
-                        New("ImageLabel", {
+                        local gI = New("ImageLabel", {
                             AnchorPoint = Vector2.new(0, 0.5),
-                            Image = bi.Url,
                             ImageColor3 = bi.Custom and "WhiteColor" or "AccentColor",
-                            ImageRectOffset = bi.ImageRectOffset,
-                            ImageRectSize = bi.ImageRectSize,
                             Position = UDim2.fromScale(0, 0.5),
                             Size = UDim2.fromOffset(22, 22),
                             Parent = gt,
                         })
+                        Library:ApplyLucideIcon(gI, bi)
                     end
 
+                    local rIns = if i.DisableCollapsing ~= true then 22 else 0
                     local tf = New("Frame", {
                         AutomaticSize = Enum.AutomaticSize.Y,
                         BackgroundTransparency = 1,
                         Position = UDim2.fromOffset(bi and 24 or 0, 0),
-                        Size = UDim2.new(1, -22 - (bi and 24 or 0), 0, 0),
+                        Size = UDim2.new(1, -rIns - (bi and 24 or 0), 0, 0),
                         Parent = gt,
                     })
                     New("UIListLayout", { Parent = tf })
@@ -13615,15 +13818,12 @@ function Library:CreateWindow(WindowInfo)
                         gca = New("ImageButton", {
                             AnchorPoint = Vector2.new(1, 0.5),
                             BackgroundTransparency = 1,
-                            Image = ArrowIcon and ArrowIcon.Url or "",
                             ImageColor3 = "WhiteColor",
-                            ImageRectOffset = ArrowIcon and ArrowIcon.ImageRectOffset or Vector2.zero,
-                            ImageRectSize = ArrowIcon and ArrowIcon.ImageRectSize or Vector2.zero,
-                            Rotation = 180,
                             Position = UDim2.fromScale(1, 0.5),
                             Size = UDim2.fromOffset(22, 22),
                             Parent = gt,
                         })
+                        if ArrowIcon then Library:ApplyLucideIcon(gca, ArrowIcon, 180) end
                     end
 
                     local gln = Library:MakeLine(gh, {
@@ -13631,9 +13831,13 @@ function Library:CreateWindow(WindowInfo)
                         Size = UDim2.new(1, 0, 0, 1),
                     })
 
-                    local gc = New("Frame", {
+                    local gc = New("ScrollingFrame", {
+                        AutomaticCanvasSize = Enum.AutomaticSize.Y,
                         BackgroundTransparency = 1,
+                        BorderSizePixel = 0,
+                        CanvasSize = UDim2.fromScale(0, 0),
                         LayoutOrder = 2,
+                        ScrollBarThickness = 0,
                         Size = UDim2.fromScale(1, 0),
                         Parent = gh,
                     })
@@ -13642,6 +13846,8 @@ function Library:CreateWindow(WindowInfo)
 
                     local gbox = {
                         Type = "Groupbox",
+                        Name = i.Name,
+                        Description = i.Description,
                         Connections = {},
                         Destroyed = false,
                         Visible = true,
@@ -13660,10 +13866,14 @@ function Library:CreateWindow(WindowInfo)
                         if rzT then StopTween(rzT, true) rzT = nil end
                         local tS = (gt.AbsoluteSize.Y / Library.DPIScale)
                         local cS = (glist.AbsoluteContentSize.Y / Library.DPIScale) + 14
-                        local tgS = UDim2.new(1, 0, 0, if gbox.Collapsed then tS else (tS + 1 + cS))
+                        if gbox.PoppedOut then
+                            cS = math.min(cS, GetPopOutBodyMaxHeight(gbox, tS + 1))
+                        end
 
+                        local tgS = UDim2.new(1, 0, 0, if gbox.Collapsed then tS else (tS + 1 + cS))
                         gc.Size = UDim2.new(1, 0, 0, cS)
                         gln.Visible = not gbox.Collapsed
+
                         if Library.Animations and Library.Animations.Groupbox then
                             local ti = Library.GroupboxTweenInfo or TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
                             local tw = TweenService:Create(gh, ti, { Size = tgS })
@@ -13711,20 +13921,36 @@ function Library:CreateWindow(WindowInfo)
                         gbox:SetCollapsed(not gbox.Collapsed)
                     end
 
+                    Library:MakeBoxPopOut(gbox, {
+                        Enabled = i.PopOut ~= false,
+                        Header = gt,
+                        Children = function()
+                            local ch = {}
+                            for _, c in bh:GetChildren() do
+                                if c:IsA("GuiObject") and c ~= gbox.PopOutPlaceholder then
+                                    table.insert(ch, c)
+                                end
+                            end
+                            return ch
+                        end,
+                        Before = function()
+                            if gca then gca.Visible = false end
+                        end,
+                        After = function()
+                            if gca then gca.Visible = i.DisableCollapsing ~= true end
+                            gbox:Resize()
+                        end
+                    })
+
                     function gbox:Destroy()
+                        if gbox.PoppedOut then gbox:SetPoppedOut(false) end
                         gbox.Destroyed = true
                         if rzT then StopTween(rzT, true) rzT = nil end
                         if caT then StopTween(caT, true) caT = nil end
-                        if gbox.Connections then
-                            for _, cn in gbox.Connections do cn:Disconnect() end
-                        end
-                        for _, el in gbox.Elements do
-                            if el.Destroy then el:Destroy() end
-                        end
+                        for _, cn in gbox.Connections do cn:Disconnect() end
+                        for _, el in gbox.Elements do if el.Destroy then el:Destroy() end end
                         table.clear(gbox.Elements)
-                        for _, sdb in gbox.DependencyBoxes do
-                            if sdb.Destroy then sdb:Destroy() end
-                        end
+                        for _, sdb in gbox.DependencyBoxes do if sdb.Destroy then sdb:Destroy() end end
                         table.clear(gbox.DependencyBoxes)
                         if gh then gh:Destroy() end
                         if bh then bh:Destroy() end
@@ -13733,6 +13959,7 @@ function Library:CreateWindow(WindowInfo)
                     function gbox:SetVisible(vis)
                         gbox.Visible = vis
                         bh.Visible = vis
+                        SyncPopOutVisibility(gbox)
                         if vis == true and Library.Searching then
                             Library:UpdateSearch(Library.SearchText)
                         end
@@ -13757,7 +13984,6 @@ function Library:CreateWindow(WindowInfo)
                     if i.DisableCollapsing ~= true and i.Collapsed == true then gbox:SetCollapsed(true) end
 
                     o:RefreshSides()
-
                     return gbox
                 end
 
@@ -14668,6 +14894,7 @@ function Library:CreateWindow(WindowInfo)
                     Library:PlayTabAnimation(TabCanvas, false)
                     Window:HideTabInfo()
 
+                    Library.PreviousTab = Tab
                     Library.ActiveTab = nil
                 end
 
@@ -15055,6 +15282,7 @@ function Library:CreateWindow(WindowInfo)
                     Library:PlayTabAnimation(TabCanvas, false)
                     Window:HideTabInfo()
 
+                    Library.PreviousTab = Tab
                     Library.ActiveTab = nil
                 end
 
@@ -15681,32 +15909,30 @@ function Library:CreateWindow(WindowInfo)
                 end
 
                 if Library.Toggled and not Library.IsMobile then
-                    local OldMouseIconEnabled = UserInputService.MouseIconEnabled
-                    local ShowCursorBinding = Library.ShowCursorBinding
-                    pcall(function()
-                        RunService:UnbindFromRenderStep(ShowCursorBinding)
-                    end)
-                    RunService:BindToRenderStep(ShowCursorBinding, Enum.RenderPriority.Last.Value, function()
+                    local scb = Library.ShowCursorBinding
+                    Library.OriginalMouseIconEnabled = UserInputService.MouseIconEnabled
+
+                    pcall(function() RunService:UnbindFromRenderStep(scb) end)
+                    RunService:BindToRenderStep(scb, Enum.RenderPriority.Last.Value, function()
                         UserInputService.MouseIconEnabled = not Library.ShowCustomCursor
 
                         Cursor.Position = UDim2.fromOffset(Mouse.X, Mouse.Y)
                         Cursor.Visible = Library.ShowCustomCursor
 
-                        if not (Library.Toggled and ScreenGui and ScreenGui.Parent) then
-                            UserInputService.MouseIconEnabled = OldMouseIconEnabled
-                            Cursor.Visible = false
-                            RunService:UnbindFromRenderStep(ShowCursorBinding)
+                        if Library.Unloaded == true or not (Library.Toggled and ScreenGui and ScreenGui.Parent) then
+                            RestoreMouseIcon()
                         end
                     end)
                 elseif not Library.Toggled then
+                    RestoreMouseIcon()
                     TooltipLabel.Visible = false
 
-                    for _, Option in Library.Options do
-                        if Option.Type == "ColorPicker" then
-                            Option.ColorMenu:Close()
-                            Option.ContextMenu:Close()
-                        elseif Option.Type == "Dropdown" or Option.Type == "KeyPicker" then
-                            Option.Menu:Close()
+                    for _, opt in Library.Options do
+                        if opt.Type == "ColorPicker" then
+                            if opt.ColorMenu then opt.ColorMenu:Close() end
+                            if opt.ContextMenu then opt.ContextMenu:Close() end
+                        elseif opt.Type == "Dropdown" or opt.Type == "KeyPicker" then
+                            if opt.Menu then opt.Menu:Close() end
                         end
                     end
                 end
@@ -15864,20 +16090,36 @@ function Library:CreateWindow(WindowInfo)
                 Library:UpdateSearch(SearchBox.Text)
             end))
 
-            Library:GiveSignal(UserInputService.InputBegan:Connect(function(Input: InputObject)
-                if Library.Unloaded then
+            Library:GiveSignal(UserInputService.InputBegan:Connect(function(inp: InputObject)
+                if Library.Unloaded then return end
+
+                if inp.KeyCode == Enum.KeyCode.Escape then
+                    local fBox = UserInputService:GetFocusedTextBox()
+                    if fBox then
+                        fBox:ReleaseFocus()
+                        return
+                    end
+
+                    if Library.ActiveDialog and Library.ActiveDialog.OutsideClickDismiss ~= false then
+                        Library.ActiveDialog:Dismiss()
+                        return
+                    end
+
+                    if CurrentMenu then
+                        CurrentMenu:Close()
+                        return
+                    end
+
                     return
                 end
 
-                if UserInputService:GetFocusedTextBox() then
-                    return
-                end
+                if UserInputService:GetFocusedTextBox() then return end
 
-                if Input.KeyCode == Library.ToggleKeybind then
+                if inp.KeyCode == Library.ToggleKeybind then
                     Library:Toggle()
                 end
 
-                if Library.NotificationHistoryKeybind and Input.KeyCode == Library.NotificationHistoryKeybind then
+                if Library.NotificationHistoryKeybind and inp.KeyCode == Library.NotificationHistoryKeybind then
                     Library:ToggleNotificationHistory()
                 end
             end))
@@ -16676,6 +16918,13 @@ function Library:Unload()
     table.clear(Library.KeybindToggles)
     table.clear(Library.DependencyBoxes)
 
+    for Index = #Library.ContextMenus, 1, -1 do
+        local Menu = table.remove(Library.ContextMenus, Index)
+        if Menu and Menu.Destroy then
+            Library:SafeCallback(Menu.Destroy, Menu)
+        end
+    end
+
     table.clear(TransparencyCache)
     table.clear(ActiveTabTweens)
     
@@ -16694,6 +16943,8 @@ function Library:Unload()
     Library.NotificationBell = nil
     Library.NotificationBellMini = nil
     Library.NotificationUnreadCount = 0
+    Library.Floats = nil
+    Library.Overlay = nil
 
     Library.EnabledFeaturesFrame = nil
     Library.EnabledFeaturesContainer = nil
