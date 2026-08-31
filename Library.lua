@@ -892,6 +892,15 @@ local function TryFuzzyMatch(txt: any, qry: string): boolean
     return (FuzzyScore(txt:lower(), qry))
 end
 
+local function FuzzyMatchScore(txt: any, qry: string): number
+    if typeof(txt) ~= "string" or txt == "" then return 0 end
+    local nrm = NormalizeSearch(txt:lower())
+    local m, sc = FuzzyScore(nrm, qry)
+    if not m then return 0 end
+    if nrm == qry then sc += 1000 end
+    return sc
+end
+
 local function FormatSearchValue(el, v): string?
     if v == nil then return nil end
     local fmt = el.FormatListValue or el.FormatDisplayValue
@@ -949,6 +958,13 @@ function Library:MatchesSearch(el, qry: string, fMatch: boolean?): boolean
         end
     end
     return false
+end
+
+function Library:UpdateAddons(p: any)
+    if not p or not p.Addons then return end
+    for _, a in p.Addons do
+        if a.Update then a:Update() end
+    end
 end
 
 local function CheckDepbox(bx, qry: string, fMatch: boolean?)
@@ -1009,29 +1025,34 @@ end
 
 local ResetTab
 
-local function ApplySearchToTab(tab, qry: string)
-    if not tab then return false end
+local function ApplySearchToTab(tab, qry: string): (boolean, number)
+    if not tab then return false, 0 end
     local hasVis = false
+    local bSc = 0
     local tMatch = TryFuzzyMatch(tab.Name, qry) or TryFuzzyMatch(tab.Description, qry)
+    bSc = math.max(bSc, FuzzyMatchScore(tab.Name, qry), FuzzyMatchScore(tab.Description, qry))
 
     for _, gb in tab.Groupboxes do
         if gb.Visible == false then continue end
         local gbMatch = tMatch or (TryFuzzyMatch(gb.Name, qry) or TryFuzzyMatch(gb.Description, qry))
+        bSc = math.max(bSc, FuzzyMatchScore(gb.Name, qry), FuzzyMatchScore(gb.Description, qry))
         local vCount = 0
 
         for _, el in gb.Elements do
             if el.Type == "Divider" then
-                el.Holder.Visible = gbMatch and el.Visible ~= false
+                el.Holder.Visible = false
                 continue
             elseif el.SubButton then
                 local vis = false
                 if (gbMatch or Library:MatchesSearch(el, qry)) and el.Visible then
                     vis = true
+                    bSc = math.max(bSc, FuzzyMatchScore(el.Text, qry))
                 else
                     el.Base.Visible = false
                 end
                 if (gbMatch or Library:MatchesSearch(el.SubButton, qry)) and el.SubButton.Visible then
                     vis = true
+                    bSc = math.max(bSc, FuzzyMatchScore(el.SubButton.Text, qry))
                 else
                     el.SubButton.Base.Visible = false
                 end
@@ -1043,6 +1064,7 @@ local function ApplySearchToTab(tab, qry: string)
             if (gbMatch or Library:MatchesSearch(el, qry)) and el.Visible then
                 el.Holder.Visible = true
                 vCount += 1
+                bSc = math.max(bSc, FuzzyMatchScore(el.Text, qry))
             else
                 el.Holder.Visible = false
             end
@@ -1050,7 +1072,9 @@ local function ApplySearchToTab(tab, qry: string)
 
         for _, db in gb.DependencyBoxes do
             if not db.Visible then continue end
-            vCount += CheckDepbox(db, qry, gbMatch)
+            local dVis, dSc = CheckDepbox(db, qry, gbMatch)
+            vCount += dVis
+            if dSc > bSc then bSc = dSc end
         end
 
         if vCount > 0 then
@@ -1058,29 +1082,39 @@ local function ApplySearchToTab(tab, qry: string)
             hasVis = true
         end
         gb.BoxHolder.Visible = vCount > 0
+        SyncPopOutVisibility(gb)
     end
 
     for _, tb in tab.Tabboxes do
         local vTabs = 0
         local vElems = {}
+        local stScs = {}
 
         for _, st in tb.Tabs do
             vElems[st] = 0
             local stMatch = tMatch or TryFuzzyMatch(st.Name, qry)
+            local sSc = FuzzyMatchScore(st.Name, qry)
+            bSc = math.max(bSc, sSc)
 
             for _, el in st.Elements do
                 if el.Type == "Divider" then
-                    el.Holder.Visible = stMatch and el.Visible ~= false
+                    el.Holder.Visible = false
                     continue
                 elseif el.SubButton then
                     local vis = false
                     if (stMatch or Library:MatchesSearch(el, qry)) and el.Visible then
                         vis = true
+                        local eSc = FuzzyMatchScore(el.Text, qry)
+                        sSc = math.max(sSc, eSc)
+                        bSc = math.max(bSc, eSc)
                     else
                         el.Base.Visible = false
                     end
                     if (stMatch or Library:MatchesSearch(el.SubButton, qry)) and el.SubButton.Visible then
                         vis = true
+                        local eSc = FuzzyMatchScore(el.SubButton.Text, qry)
+                        sSc = math.max(sSc, eSc)
+                        bSc = math.max(bSc, eSc)
                     else
                         el.SubButton.Base.Visible = false
                     end
@@ -1092,6 +1126,9 @@ local function ApplySearchToTab(tab, qry: string)
                 if (stMatch or Library:MatchesSearch(el, qry)) and el.Visible then
                     el.Holder.Visible = true
                     vElems[st] += 1
+                    local eSc = FuzzyMatchScore(el.Text, qry)
+                    sSc = math.max(sSc, eSc)
+                    bSc = math.max(bSc, eSc)
                 else
                     el.Holder.Visible = false
                 end
@@ -1099,35 +1136,54 @@ local function ApplySearchToTab(tab, qry: string)
 
             for _, db in st.DependencyBoxes do
                 if not db.Visible then continue end
-                vElems[st] += CheckDepbox(db, qry, stMatch)
+                local dVis, dSc = CheckDepbox(db, qry, stMatch)
+                vElems[st] += dVis
+                sSc = math.max(sSc, dSc)
+                bSc = math.max(bSc, dSc)
             end
+
+            stScs[st] = sSc
         end
 
+        local bST, bSTS = nil, -1
         for st, v in vElems do
             st.ButtonHolder.Visible = v > 0
             if v > 0 then
                 vTabs += 1
                 hasVis = true
-                if tb.ActiveTab == st then
-                    st:Resize()
-                elseif tb.ActiveTab and vElems[tb.ActiveTab] == 0 then
-                    st:Show()
+                local sc = stScs[st] or 0
+                if sc > bSTS then
+                    bSTS = sc
+                    bST = st
                 end
             end
         end
+
+        local aST = tb.ActiveTab
+        local aVis = aST and (vElems[aST] or 0) > 0
+        local aSc = aST and (stScs[aST] or -1) or -1
+
+        if aVis and aSc >= bSTS then
+            aST:Resize()
+        elseif bST then
+            bST:Show()
+        end
+
         tb.BoxHolder.Visible = vTabs > 0
+        SyncPopOutVisibility(tb)
     end
 
     if tab.SubTabs then
         local vSubTabs = {}
         for _, st in tab.SubTabs do
-            local stVis
+            local stVis, stSc
             if TryFuzzyMatch(st.Name, qry) then
                 ResetTab(st)
-                stVis = true
+                stVis, stSc = true, FuzzyMatchScore(st.Name, qry)
             else
-                stVis = ApplySearchToTab(st, qry)
+                stVis, stSc = ApplySearchToTab(st, qry)
             end
+            if stSc > bSc then bSc = stSc end
             vSubTabs[st] = stVis
             st.Button.Visible = stVis
             if stVis then hasVis = true end
@@ -1144,7 +1200,7 @@ local function ApplySearchToTab(tab, qry: string)
         end
     end
 
-    return hasVis
+    return hasVis, bSc
 end
 
 function ResetTab(tab)
@@ -5975,15 +6031,12 @@ do
         end
 
         function Toggle:RunChanged()
+            if Toggle.Disabled then return end
             Library:SafeCallback(Toggle.Callback, Toggle.Value)
             Library:SafeCallback(Toggle.Changed, Toggle.Value)
         end
 
         function Toggle:SetValue(Value)
-            if Toggle.Disabled then
-                return
-            end
-
             Toggle.Value = Value
             Toggle:Display()
 
@@ -5994,7 +6047,9 @@ do
                 end
             end
 
-            Library:UpdateDependencyBoxes()
+            if not Toggle.Disabled then
+                Library:UpdateDependencyBoxes()
+            end
 
             if not Toggle.AnyKeyPickerPicking then
                 Toggle:RunChanged()
@@ -6008,14 +6063,12 @@ do
                 Toggle.TooltipTable.Disabled = Toggle.Disabled
             end
 
-            for _, Addon in Toggle.Addons do
-                if Addon.Type == "KeyPicker" and Addon.SyncToggleState then
-                    Addon:Update()
-                end
-            end
+            Library:UpdateAddons(Toggle)
 
             Button.Active = not Toggle.Disabled
             Toggle:Display()
+
+            Library:UpdateDependencyBoxes()
         end
 
         function Toggle:SetVisible(Visible: boolean)
@@ -6478,6 +6531,7 @@ do
         end
 
         function Input:RunChanged()
+            if Input.Disabled then return end
             Library:SafeCallback(Input.Callback, Input.Value)
             Library:SafeCallback(Input.Changed, Input.Value)
         end
@@ -6952,15 +7006,12 @@ do
         end
 
         function Slider:RunChanged()
+            if Slider.Disabled then return end
             Library:SafeCallback(Slider.Callback, Slider.Value)
             Library:SafeCallback(Slider.Changed, Slider.Value)
         end
 
         function Slider:SetValue(Str)
-            if Slider.Disabled then
-                return
-            end
-
             local Num = tonumber(Str)
             if not Num or Num == Slider.Value then
                 return
@@ -7332,12 +7383,12 @@ do
                 ZIndex = 3,
                 Parent = eb,
             })
-            eb.MouseEnter:Connect(function()
+            table.insert(o.Connections, eb.MouseEnter:Connect(function()
                 if not o.Disabled then TweenService:Create(ei, Library.TweenInfo, { ImageTransparency = 0 }):Play() end
-            end)
-            eb.MouseLeave:Connect(function()
+            end))
+            table.insert(o.Connections, eb.MouseLeave:Connect(function()
                 if not o.Disabled then TweenService:Create(ei, Library.TweenInfo, { ImageTransparency = 0.5 }):Play() end
-            end)
+            end))
             Library:AddTooltip("Expand", nil, eb)
         end
 
@@ -7556,6 +7607,7 @@ do
         end
 
         function o:RunChanged()
+            if o.Disabled then return end
             Library:SafeCallback(o.Callback, o.Value)
             Library:SafeCallback(o.Changed, o.Value)
         end
@@ -7663,7 +7715,7 @@ do
                 end
             end
 
-            btn.MouseButton1Click:Connect(function()
+            table.insert(o.Connections, btn.MouseButton1Click:Connect(function()
                 local ent = r.Entry
                 if not ent or ent.IsDisabled or dSel then return end
                 local sel = d.Multi and o.Value[ent.Value] or (o.Value == ent.Value)
@@ -7682,25 +7734,25 @@ do
                 o:Display()
                 Library:UpdateDependencyBoxes()
                 o:RunChanged()
-            end)
+            end))
 
-            btn.MouseEnter:Connect(function()
+            table.insert(o.Connections, btn.MouseEnter:Connect(function()
                 local ent = r.Entry
                 if not ent or ent.IsDisabled or r.Selected then return end
                 TweenService:Create(cnt, Library.TweenInfo, { BackgroundTransparency = 0.85 }):Play()
                 TweenService:Create(btn, Library.TweenInfo, { TextTransparency = 0.25 }):Play()
                 if img then TweenService:Create(img, Library.TweenInfo, { ImageTransparency = 0.25 }):Play() end
-            end)
+            end))
 
-            btn.MouseLeave:Connect(function()
+            table.insert(o.Connections, btn.MouseLeave:Connect(function()
                 local ent = r.Entry
                 if not ent or ent.IsDisabled or r.Selected then return end
                 TweenService:Create(cnt, Library.TweenInfo, { BackgroundTransparency = 1 }):Play()
                 TweenService:Create(btn, Library.TweenInfo, { TextTransparency = 0.5 }):Play()
                 if img then TweenService:Create(img, Library.TweenInfo, { ImageTransparency = 0.5 }):Play() end
-            end)
+            end))
 
-            btn.InputBegan:Connect(function(sIn)
+            table.insert(o.Connections, btn.InputBegan:Connect(function(sIn)
                 if not (d.Multi and o.DragSelect and not Library.IsMobile) then return end
                 local ent = r.Entry
                 if not ent or ent.IsDisabled or not IsMouseInput(sIn) then return end
@@ -7735,7 +7787,7 @@ do
 
                 table.insert(o.Connections, dEndConn)
                 table.insert(o.Connections, dChgConn)
-            end)
+            end))
 
             return r
         end
@@ -7856,9 +7908,9 @@ do
                 Parent = cb,
             })
 
-            cb.MouseEnter:Connect(function() TweenService:Create(cb, Library.TweenInfo, { BackgroundTransparency = 0 }):Play() end)
-            cb.MouseLeave:Connect(function() TweenService:Create(cb, Library.TweenInfo, { BackgroundTransparency = 1 }):Play() end)
-            cb.MouseButton1Click:Connect(function() o:Collapse() end)
+            table.insert(o.Connections, cb.MouseEnter:Connect(function() TweenService:Create(cb, Library.TweenInfo, { BackgroundTransparency = 0 }):Play() end))
+            table.insert(o.Connections, cb.MouseLeave:Connect(function() TweenService:Create(cb, Library.TweenInfo, { BackgroundTransparency = 1 }):Play() end))
+            table.insert(o.Connections, cb.MouseButton1Click:Connect(function() o:Collapse() end))
 
             local lTop = 34
             if d.Searchable then
@@ -7922,7 +7974,7 @@ do
                 Parent = expF,
             })
 
-            expO.MouseButton1Click:Connect(function() o:Collapse() end)
+            table.insert(o.Connections, expO.MouseButton1Click:Connect(function() o:Collapse() end))
         end
 
         function rExpL()
@@ -7992,18 +8044,18 @@ do
                 tbl.Value = v
 
                 if not dis then
-                    btn.MouseEnter:Connect(function()
+                    table.insert(o.Connections, btn.MouseEnter:Connect(function()
                         if isValSel(v) then return end
                         TweenService:Create(item, Library.TweenInfo, { BackgroundTransparency = 0.5 }):Play()
-                    end)
-                    btn.MouseLeave:Connect(function()
+                    end))
+                    table.insert(o.Connections, btn.MouseLeave:Connect(function()
                         if isValSel(v) then return end
                         TweenService:Create(item, Library.TweenInfo, { BackgroundTransparency = 1 }):Play()
-                    end)
-                    btn.MouseButton1Click:Connect(function()
+                    end))
+                    table.insert(o.Connections, btn.MouseButton1Click:Connect(function()
                         togVal(v)
                         if not d.Multi then o:Collapse() end
-                    end)
+                    end))
                 end
 
                 tbl:UpdateButton()
@@ -8096,8 +8148,9 @@ do
 
             if not o.Disabled then
                 Library:UpdateDependencyBoxes()
-                o:RunChanged()
             end
+
+            o:RunChanged()
         end
 
         function o:SetValues(val)
@@ -8118,6 +8171,9 @@ do
 
             if chg and not o.Disabled then
                 Library:UpdateDependencyBoxes()
+            end
+
+            if chg then
                 o:RunChanged()
             end
         end
@@ -8183,6 +8239,7 @@ do
             o:Collapse()
             db.Active = not o.Disabled
             o:UpdateColors()
+            Library:UpdateDependencyBoxes()
         end
 
         function o:SetVisible(vis)
@@ -9588,6 +9645,12 @@ do
                 local Element = Dependency[1]
                 local Value = Dependency[2]
 
+                if Element.Disabled then
+                    DepboxContainer.Visible = false
+                    Depbox.Visible = false
+                    return
+                end
+
                 if Element.Type == "Toggle" and Element.Value ~= Value then
                     DepboxContainer.Visible = false
                     Depbox.Visible = false
@@ -9750,6 +9813,12 @@ do
             for _, Dependency in DepGroupbox.Dependencies do
                 local Element = Dependency[1]
                 local Value = Dependency[2]
+
+                if Element.Disabled then
+                    DepboxContainer.Visible = false
+                    Depbox.Visible = false
+                    return
+                end
 
                 if Element.Type == "Toggle" and Element.Value ~= Value then
                     DepGroupboxContainer.Visible = false
@@ -14911,38 +14980,26 @@ function Library:CreateWindow(WindowInfo)
                     TabButton.LayoutOrder = Order
                 end
 
+                function Tab:SetTooltip(txt: string?)
+                    Tab.Tooltip = txt
+                    if Tab.TooltipTable then
+                        Tab.TooltipTable:Destroy()
+                        Tab.TooltipTable = nil
+                    end
+                    if typeof(txt) == "string" then
+                        Tab.TooltipTable = Library:AddTooltip(txt, nil, TabButton)
+                    end
+                end
+
                 function Tab:Destroy()
                     Tab.Destroyed = true
 
-                    if Tab.Connections then
-                        for _, Connection in Tab.Connections do
-                            Connection:Disconnect()
-                        end
+                    if Tab.TooltipTable then
+                        Tab.TooltipTable:Destroy()
+                        Tab.TooltipTable = nil
                     end
 
-                    for _, Groupbox in Tab.Groupboxes do
-                        if Groupbox.Destroy then
-                            Groupbox:Destroy()
-                        end
-                    end
-                    table.clear(Tab.Groupboxes)
-
-                    for _, Tabbox in Tab.Tabboxes do
-                        if Tabbox.Destroy then
-                            Tabbox:Destroy()
-                        end
-                    end
-                    table.clear(Tab.Tabboxes)
-
-                    for _, DepGroupbox in Tab.DependencyGroupboxes do
-                        if DepGroupbox.Destroy then
-                            DepGroupbox:Destroy()
-                        end
-                    end
-
-                    if TabCanvas then
-                        TabCanvas:Destroy()
-                    elseif TabContainer then
+                    if TabContainer then
                         TabContainer:Destroy()
                     end
 
@@ -14953,10 +15010,10 @@ function Library:CreateWindow(WindowInfo)
                                 break
                             end
                         end
-                        
+
                         TabButton:Destroy()
                     end
-                    
+
                     Library.Tabs[Name] = nil
                 end
 
@@ -14965,6 +15022,10 @@ function Library:CreateWindow(WindowInfo)
                         Entry.Tab = Tab
                         break
                     end
+                end
+
+                if typeof(Tooltip) == "string" then
+                    Tab.TooltipTable = Library:AddTooltip(Tooltip, nil, TabButton)
                 end
 
                 if not Library.ActiveTab then
