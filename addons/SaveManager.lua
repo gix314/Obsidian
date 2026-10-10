@@ -209,7 +209,43 @@ local ElementParser = {}; do
         end,
         function(e: any?, d: any)
             if not e or typeof(d.value) ~= "table" then return end
-            e:SetValue(d.value)
+
+            local validValues = e.Values or e.Default or {}
+            local allowed = {}
+            for _, v in ipairs(validValues) do
+                allowed[v] = true
+            end
+
+            local rawList = d.value
+            if rawList[1] == nil then
+                local sorted = {}
+                for k, v in pairs(rawList) do
+                    table.insert(sorted, { k = k, o = tonumber(v) or 99 })
+                end
+                table.sort(sorted, function(a, b) return a.o < b.o end)
+                rawList = {}
+                for _, it in ipairs(sorted) do
+                    table.insert(rawList, it.k)
+                end
+            end
+
+            local sanitized = {}
+            local seen = {}
+            for _, v in ipairs(rawList) do
+                if allowed[v] and not seen[v] then
+                    seen[v] = true
+                    table.insert(sanitized, v)
+                end
+            end
+
+            for _, v in ipairs(validValues) do
+                if not seen[v] then
+                    seen[v] = true
+                    table.insert(sanitized, v)
+                end
+            end
+
+            e:SetValue(sanitized)
         end
     )
 
