@@ -209,7 +209,43 @@ local ElementParser = {}; do
         end,
         function(e: any?, d: any)
             if not e or typeof(d.value) ~= "table" then return end
-            e:SetValue(d.value)
+
+            local validValues = e.Values or e.Default or {}
+            local allowed = {}
+            for _, v in ipairs(validValues) do
+                allowed[v] = true
+            end
+
+            local rawList = d.value
+            if rawList[1] == nil then
+                local sorted = {}
+                for k, v in pairs(rawList) do
+                    table.insert(sorted, { k = k, o = tonumber(v) or 99 })
+                end
+                table.sort(sorted, function(a, b) return a.o < b.o end)
+                rawList = {}
+                for _, it in ipairs(sorted) do
+                    table.insert(rawList, it.k)
+                end
+            end
+
+            local sanitized = {}
+            local seen = {}
+            for _, v in ipairs(rawList) do
+                if allowed[v] and not seen[v] then
+                    seen[v] = true
+                    table.insert(sanitized, v)
+                end
+            end
+
+            for _, v in ipairs(validValues) do
+                if not seen[v] then
+                    seen[v] = true
+                    table.insert(sanitized, v)
+                end
+            end
+
+            e:SetValue(sanitized)
         end
     )
 
@@ -1279,7 +1315,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
         Text = "Config name"
     })
 
-    ConfigurationBox:AddButton("Create config", function()
+    ConfigurationBox:AddButton("Create", function()
         local ConfigName = ConfigNameInput.Value
         if IsStringEmpty(ConfigName) then
             SaveManager.Library:Notify("Configuration name cannot be empty.")
@@ -1346,7 +1382,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
     })
 
     local GBT1 = ConfigurationBox:AddButton({
-        Text = "Load config",
+        Text = "Load",
         DoubleClick = false,
 
         Func = function()
@@ -1367,7 +1403,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
     })
     
     GBT1:AddButton({
-        Text = "Overwrite config",
+        Text = "Overwrite",
         DoubleClick = false,
 
         Func = function()
@@ -1377,31 +1413,18 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
                 return
             end
 
-            ShowDialog(
-                function(): boolean
-                    return true
-                end,
+            local Success, ErrorMessage = SaveManager:Save(ConfigName)
+            if not Success then
+                SaveManager.Library:Notify(string.format("Failed to overwrite config %q: %s", ConfigName, ErrorMessage))
+                return
+            end
 
-                "SaveManager_OverwriteConfig",
-                "Overwrite config",
-                string.format("Are you sure you want to overwrite %q with your current settings? This cannot be undone.", ConfigName),
-
-                "Overwrite",
-                function()
-                    local Success, ErrorMessage = SaveManager:Save(ConfigName)
-                    if not Success then
-                        SaveManager.Library:Notify(string.format("Failed to overwrite config %q: %s", ConfigName, ErrorMessage))
-                        return
-                    end
-
-                    SaveManager.Library:Notify(string.format("Successfully overwrote config %q", ConfigName))
-                end
-            )
+            SaveManager.Library:Notify(string.format("Successfully overwrote config %q", ConfigName))
         end
     })
 
     local GBT2 = ConfigurationBox:AddButton({
-        Text = "Delete config",
+        Text = "Delete",
         DoubleClick = false,
 
         Func = function()
@@ -1411,33 +1434,20 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
                 return
             end
 
-            ShowDialog(
-                function(): boolean
-                    return true
-                end,
+            local Success, ErrorMessage = SaveManager:Delete(ConfigName)
+            if not Success then
+                SaveManager.Library:Notify(string.format("Failed to delete config %q: %s", ConfigName, ErrorMessage))
+                return
+            end
 
-                "SaveManager_DeleteConfig",
-                "Delete config",
-                string.format("Are you sure you want to delete %q? This cannot be undone.", ConfigName),
-                
-                "Delete",
-                function()
-                    local Success, ErrorMessage = SaveManager:Delete(ConfigName)
-                    if not Success then
-                        SaveManager.Library:Notify(string.format("Failed to delete config %q: %s", ConfigName, ErrorMessage))
-                        return
-                    end
-
-                    SaveManager.Library:Notify(string.format("Successfully deleted config %q", ConfigName))
-                    RefreshAutoloadConfigLabel()
-                    RefreshAutoSaveConfigLabel()
-                end
-            )
+            SaveManager.Library:Notify(string.format("Successfully deleted config %q", ConfigName))
+            RefreshAutoloadConfigLabel()
+            RefreshAutoSaveConfigLabel()
         end
     })
 
     ConfigurationBox:AddToggle("SaveManager_AutoSave", {
-        Text = "Auto Save Config",
+        Text = "Auto-save",
         Default = SaveManager:GetAutoSaveConfig() ~= "none",
         Callback = function(State)
             if State then
@@ -1480,7 +1490,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
     GBT2:AddButton("Refresh list", RefreshList)
 
     local GBT3 = ConfigurationBox:AddButton({
-        Text = "Set as autoload",
+        Text = "Set autoload",
         DoubleClick = false,
 
         Func = function()
@@ -1538,7 +1548,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
     end)
 
     local GBT0 = ConfigurationBox:AddButton({
-        Text = "Import config",
+        Text = "Import",
         DoubleClick = false,
         Func = function()
             SaveManager:ShowImportDialog()
@@ -1546,7 +1556,7 @@ function SaveManager:BuildConfigSection(Tab: any, IconName: string)
     })
 
     GBT0:AddButton({
-        Text = "Export config",
+        Text = "Export",
         DoubleClick = false,
         Func = function()
             local cfg = ConfigList.Value
