@@ -12900,14 +12900,20 @@ function Library:CreateWindow(WindowInfo)
 
 		TitleHolder = New("Frame", {
 			BackgroundTransparency = 1,
+			ClipsDescendants = true,
 			Size = UDim2.new(0, InitialLeftWidth, 1, 0),
 			Parent = TopBar,
 		})
 		New("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 			Padding = UDim.new(0, 6),
+			Parent = TitleHolder,
+		})
+		New("UIPadding", {
+			PaddingLeft = UDim.new(0, 12),
+			PaddingRight = UDim.new(0, 8),
 			Parent = TitleHolder,
 		})
 
@@ -12948,17 +12954,23 @@ function Library:CreateWindow(WindowInfo)
 				IconWidth = WindowIcon.Size.X.Offset + 6
 			end
 
-			local MaxWidth = math.max(0, (TitleHolder.AbsoluteSize.X / Library.DPIScale) - IconWidth - 12)
+			local MaxWidth = math.max(0, (TitleHolder.AbsoluteSize.X / Library.DPIScale) - IconWidth - 20)
 			local NaturalWidth = Library:GetTextBounds(WindowTitle.Text, Library.Scheme.Font, WindowTitle.TextSize)
 			WindowTitle.Size = UDim2.new(0, math.min(NaturalWidth, MaxWidth), 1, 0)
 		end
 		RefreshWindowTitleSize()
 
+		TitleHolder:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			RefreshWindowTitleSize()
+		end)
+
+		local RightBarInset = if WindowInfo.Minimizable then 136 else 106
+
 		RightWrapper = New("Frame", {
 			AnchorPoint = Vector2.new(0, 0.5),
 			BackgroundTransparency = 1,
 			Position = UDim2.new(0, InitialLeftWidth + 8, 0.5, 0),
-			Size = UDim2.new(1, -InitialLeftWidth - 8 - 49 - RightBarInset, 1, -16),
+			Size = UDim2.new(1, -InitialLeftWidth - 8 - RightBarInset, 1, -16),
 			Parent = TopBar,
 		})
 
@@ -12971,58 +12983,61 @@ function Library:CreateWindow(WindowInfo)
 		})
 
 		CurrentTabInfo = New("Frame", {
-			Size = UDim2.fromScale(WindowInfo.DisableSearch and 1 or 0.5, 1),
-			Visible = false,
+			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundTransparency = 1,
+			Size = UDim2.new(0, 0, 1, 0),
+			Visible = false,
 			Parent = RightWrapper,
 		})
-
-		New("UIFlexItem", {
-			FlexMode = Enum.UIFlexMode.Grow,
+		New("UISizeConstraint", {
+			MaxSize = Vector2.new(220, math.huge),
 			Parent = CurrentTabInfo,
 		})
-
+		New("UIFlexItem", {
+			FlexMode = Enum.UIFlexMode.None,
+			Parent = CurrentTabInfo,
+		})
 		New("UIListLayout", {
 			FillDirection = Enum.FillDirection.Vertical,
 			HorizontalAlignment = Enum.HorizontalAlignment.Left,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 			Parent = CurrentTabInfo,
 		})
-
 		New("UIPadding", {
-			PaddingBottom = UDim.new(0, 8),
-			PaddingLeft = UDim.new(0, 8),
+			PaddingBottom = UDim.new(0, 2),
+			PaddingLeft = UDim.new(0, 4),
 			PaddingRight = UDim.new(0, 8),
-			PaddingTop = UDim.new(0, 8),
+			PaddingTop = UDim.new(0, 2),
 			Parent = CurrentTabInfo,
 		})
 
 		CurrentTabLabel = New("TextLabel", {
+			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.fromOffset(0, 0),
 			Text = "",
 			TextSize = 14,
+			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Parent = CurrentTabInfo,
 		})
 
 		CurrentTabDescription = New("TextLabel", {
+			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.fromOffset(0, 0),
 			Text = "",
-			TextWrapped = true,
-			TextSize = 14,
-			TextXAlignment = Enum.TextXAlignment.Left,
+			TextSize = 13,
 			TextTransparency = 0.5,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Left,
 			Parent = CurrentTabInfo,
 		})
 
 		SearchBox = New("TextBox", {
 			BackgroundColor3 = "MainColor",
 			PlaceholderText = "Search...",
-			Size = WindowInfo.SearchbarSize,
+			Size = UDim2.new(1, 0, 1, 0),
 			TextSize = 15,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Visible = not (WindowInfo.DisableSearch or false),
@@ -14333,22 +14348,26 @@ function Library:CreateWindow(WindowInfo)
             end
 
             function Window:SetSidebarWidth(w)
-                w = math.clamp(w, 48, MainFrame.Size.X.Offset - WindowInfo.MinContainerWidth - 1)
+				w = math.clamp(w, 48, MainFrame.Size.X.Offset - WindowInfo.MinContainerWidth - 1)
 
-                DividerLine.Position = UDim2.fromOffset(w, 0)
-                TitleHolder.Size = UDim2.new(0, w, 1, 0)
-                RightWrapper.Position = UDim2.new(0, w + 8, 0.5, 0)
-                RightWrapper.Size = UDim2.new(1, -w - 8 - 49 - RightBarInset, 1, -16)
-                Tabs.Size = UDim2.new(0, w, 1, -70)
-                Container.Size = UDim2.new(1, -w - 1, 1, -70)
+				DividerLine.Position = UDim2.fromOffset(w, 0)
+				TitleHolder.Size = UDim2.new(0, w, 1, 0)
+				RightWrapper.Position = UDim2.new(0, w + 8, 0.5, 0)
+				RightWrapper.Size = UDim2.new(1, -w - 8 - RightBarInset, 1, -16)
+				Tabs.Size = UDim2.new(0, w, 1, -70)
+				Container.Size = UDim2.new(1, -w - 1, 1, -70)
 
-                if WindowInfo.EnableCompacting then
-                    ApplyCompact()
-                end
-                if not IsCompact then
-                    LastExpandedWidth = w
-                end
-            end
+				if WindowInfo.EnableCompacting then
+					ApplyCompact()
+				end
+				if not IsCompact then
+					LastExpandedWidth = w
+				end
+
+				if RefreshWindowTitleSize then
+					RefreshWindowTitleSize()
+				end
+			end
 
             function Window:ShowTabInfo(n, d)
                 CurrentTabLabel.Text = string.format("<b>%s</b>", tostring(n or ""))
@@ -14388,21 +14407,19 @@ function Library:CreateWindow(WindowInfo)
                 end
 
                 local TabButton
-                local TabLabel
-                local TabIcon
-                local TabHolder
-                local TabCanvas
-                local TabContainer
-                local TabLeft
-                local TabRight
-                local TabFull
-                local TabChevron
-                local TabButtonInfo
-                local SidebarList
-                local SidebarListLayout
-                local SidebarListTween
-                local SidebarEntries = {}
-                local Expanded = false
+				local TabLabel
+				local TabIcon
+				local TabHolder
+				local TabCanvas
+				local TabContainer
+				local TabScroll
+				local TabChevron
+				local TabButtonInfo
+				local SidebarList
+				local SidebarListLayout
+				local SidebarListTween
+				local SidebarEntries = {}
+				local Expanded = false
 
                 Icon = Library:GetCustomIcon(Icon)
                 do
