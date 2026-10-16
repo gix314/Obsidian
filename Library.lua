@@ -14624,6 +14624,9 @@ function Library:CreateWindow(WindowInfo)
 				}
 
 				function Tab:GetSideContainer(Side)
+					local TargetScroll = self.Scroll or TabScroll
+					local Sections = self.Sections or Tab.Sections
+
 					local TargetSide = "Left"
 					local IsFull = false
 
@@ -14646,21 +14649,21 @@ function Library:CreateWindow(WindowInfo)
 						end
 					end
 
-					local LastSection = Tab.Sections[#Tab.Sections]
+					local LastSection = Sections[#Sections]
 
 					if IsFull then
 						local FullRow = New("Frame", {
 							AutomaticSize = Enum.AutomaticSize.Y,
 							BackgroundTransparency = 1,
-							LayoutOrder = #Tab.Sections + 1,
+							LayoutOrder = #Sections + 1,
 							Size = UDim2.new(1, 0, 0, 0),
-							Parent = TabScroll,
+							Parent = TargetScroll,
 						})
 						New("UIListLayout", {
 							Padding = UDim.new(0, 6),
 							Parent = FullRow,
 						})
-						table.insert(Tab.Sections, {
+						table.insert(Sections, {
 							Type = "Full",
 							Container = FullRow,
 						})
@@ -14671,9 +14674,9 @@ function Library:CreateWindow(WindowInfo)
 						local Row = New("Frame", {
 							AutomaticSize = Enum.AutomaticSize.Y,
 							BackgroundTransparency = 1,
-							LayoutOrder = #Tab.Sections + 1,
+							LayoutOrder = #Sections + 1,
 							Size = UDim2.new(1, 0, 0, 0),
-							Parent = TabScroll,
+							Parent = TargetScroll,
 						})
 						local LeftCol = New("Frame", {
 							AutomaticSize = Enum.AutomaticSize.Y,
@@ -14706,7 +14709,7 @@ function Library:CreateWindow(WindowInfo)
 							Left = LeftCol,
 							Right = RightCol,
 						}
-						table.insert(Tab.Sections, LastSection)
+						table.insert(Sections, LastSection)
 					end
 
 					if TargetSide == "Right" then
@@ -15638,72 +15641,73 @@ function Library:CreateWindow(WindowInfo)
                 local MoveSubTabUnderline
 
                 local function CreateSubTabBar()
-                    if SubTabBar then
-                        return
-                    end
+					if SubTabBar then
+						return
+					end
 
-                    SubTabBar = New("Frame", {
-                        BackgroundTransparency = 1,
-                        Size = UDim2.new(1, -4, 0, SUBTAB_BAR_HEIGHT),
-                        Position = UDim2.fromOffset(2, 0),
-                        ZIndex = 2,
-                        Parent = TabContainer,
-                    })
-                    SubTabButtons = New("Frame", {
-                        BackgroundTransparency = 1,
-                        Size = UDim2.fromScale(1, 1),
-                        Parent = SubTabBar,
-                    })
-                    SubTabBarLayout = New("UIListLayout", {
-                        FillDirection = Enum.FillDirection.Horizontal,
-                        HorizontalAlignment = Enum.HorizontalAlignment[SubTabAlignment],
-                        VerticalAlignment = Enum.VerticalAlignment.Center,
-                        Padding = UDim.new(0, 6),
-                        Parent = SubTabButtons,
-                    })
+					SubTabBar = New("Frame", {
+						BackgroundTransparency = 1,
+						Size = UDim2.new(1, -4, 0, SUBTAB_BAR_HEIGHT),
+						Position = UDim2.fromOffset(2, 0),
+						ZIndex = 2,
+						Parent = TabContainer,
+					})
+					SubTabButtons = New("Frame", {
+						BackgroundTransparency = 1,
+						Size = UDim2.fromScale(1, 1),
+						Parent = SubTabBar,
+					})
+					SubTabBarLayout = New("UIListLayout", {
+						FillDirection = Enum.FillDirection.Horizontal,
+						HorizontalAlignment = Enum.HorizontalAlignment[SubTabAlignment],
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						Padding = UDim.new(0, 6),
+						Parent = SubTabButtons,
+					})
 
-                    SubTabUnderline = New("Frame", {
-                        AnchorPoint = Vector2.new(0, 1),
-                        BackgroundColor3 = "AccentColor",
-                        BorderSizePixel = 0,
-                        Position = UDim2.new(0, 0, 1, 0),
-                        Size = UDim2.fromOffset(0, 1),
-                        Visible = false,
-                        Parent = SubTabBar,
-                    })
-                    New("UIGradient", {
-                        Color = function()
-                            return ColorSequence.new({
-                                ColorSequenceKeypoint.new(0, Library.Scheme.FontColor),
-                                ColorSequenceKeypoint.new(0.5, Library.Scheme.AccentColor),
-                                ColorSequenceKeypoint.new(1, Library.Scheme.FontColor),
-                            })
-                        end,
-                        Transparency = NumberSequence.new({
-                            NumberSequenceKeypoint.new(0, 1),
-                            NumberSequenceKeypoint.new(0.2, 0.85),
-                            NumberSequenceKeypoint.new(0.5, 0.1),
-                            NumberSequenceKeypoint.new(0.8, 0.85),
-                            NumberSequenceKeypoint.new(1, 1),
-                        }),
-                        Parent = SubTabUnderline,
-                    })
+					SubTabUnderline = New("Frame", {
+						AnchorPoint = Vector2.new(0, 1),
+						BackgroundColor3 = "AccentColor",
+						BorderSizePixel = 0,
+						Position = UDim2.new(0, 0, 1, 0),
+						Size = UDim2.fromOffset(0, 1),
+						Visible = false,
+						Parent = SubTabBar,
+					})
+					New("UIGradient", {
+						Color = function()
+							return ColorSequence.new({
+								ColorSequenceKeypoint.new(0, Library.Scheme.FontColor),
+								ColorSequenceKeypoint.new(0.5, Library.Scheme.AccentColor),
+								ColorSequenceKeypoint.new(1, Library.Scheme.FontColor),
+							})
+						end,
+						Transparency = NumberSequence.new({
+							NumberSequenceKeypoint.new(0, 1),
+							NumberSequenceKeypoint.new(0.2, 0.85),
+							NumberSequenceKeypoint.new(0.5, 0.1),
+							NumberSequenceKeypoint.new(0.8, 0.85),
+							NumberSequenceKeypoint.new(1, 1),
+						}),
+						Parent = SubTabUnderline,
+					})
 
-                    table.insert(
-                        Tab.Connections,
-                        SubTabBar:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-                            if Tab.ActiveSubTab then
-                                SubTabUnderline.Visible = false
-                                MoveSubTabUnderline(Tab.ActiveSubTab.Button)
-                            end
-                        end)
-                    )
+					table.insert(
+						Tab.Connections,
+						SubTabBar:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+							if Tab.ActiveSubTab then
+								SubTabUnderline.Visible = false
+								MoveSubTabUnderline(Tab.ActiveSubTab.Button)
+							end
+						end)
+					)
 
-                    TabLeft.Visible = false
-                    TabRight.Visible = false
+					if TabScroll then
+						TabScroll.Visible = false
+					end
 
-                    Tab:RefreshSides()
-                end
+					Tab:RefreshSides()
+				end
 
                 function MoveSubTabUnderline(btn)
                     if not SubTabUnderline then
@@ -15763,14 +15767,14 @@ function Library:CreateWindow(WindowInfo)
                     end
                 end
 
-                function Tab:GetContentOffset()
-                    local off = WarningBoxHolder.Visible and WarningBox.Size.Y.Offset + 8 or 0
-                    if SubTabBar then
-                        SubTabBar.Position = UDim2.new(0, 2, 0, off)
-                        off += SUBTAB_BAR_HEIGHT + 6
-                    end
-                    return off
-                end
+				function Tab:GetContentOffset()
+					local off = WarningBoxHolder.Visible and WarningBox.Size.Y.Offset + 8 or 0
+					if SubTabBar then
+						SubTabBar.Position = UDim2.new(0, 2, 0, off)
+						off = off + SUBTAB_BAR_HEIGHT + 6
+					end
+					return off
+				end
 
                 function Tab:AddSubTab(...)
                     local sName = nil
