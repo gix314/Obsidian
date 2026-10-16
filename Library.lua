@@ -14488,309 +14488,305 @@ function Library:CreateWindow(WindowInfo)
                         Parent = TabCanvas,
                     })
 
-                    TabFull = New("ScrollingFrame", {
-                        AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                        BackgroundTransparency = 1,
-                        CanvasSize = UDim2.fromScale(0, 0),
-                        ScrollBarImageTransparency = 1,
-                        ScrollBarThickness = 0,
-                        Size = UDim2.new(1, 0, 1, 0),
-                        Parent = TabContainer,
-                    })
-                    New("UIListLayout", { Padding = UDim.new(0, 2), Parent = TabFull })
-                    New("UIPadding", { PaddingBottom = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 2), PaddingTop = UDim.new(0, 2), Parent = TabFull })
-                    do
-                        New("Frame", { BackgroundTransparency = 1, LayoutOrder = -1, Parent = TabFull })
-                        New("Frame", { BackgroundTransparency = 1, LayoutOrder = 1, Parent = TabFull })
-                    end
+                    TabScroll = New("ScrollingFrame", {
+						AutomaticCanvasSize = Enum.AutomaticSize.Y,
+						BackgroundTransparency = 1,
+						CanvasSize = UDim2.fromScale(0, 0),
+						ScrollBarImageTransparency = 1,
+						ScrollBarThickness = 0,
+						Size = UDim2.new(1, 0, 1, 0),
+						Parent = TabContainer,
+					})
+					New("UIListLayout", {
+						Padding = UDim.new(0, 6),
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Parent = TabScroll,
+					})
+					New("UIPadding", {
+						PaddingBottom = UDim.new(0, 4),
+						PaddingLeft = UDim.new(0, 2),
+						PaddingRight = UDim.new(0, 2),
+						PaddingTop = UDim.new(0, 2),
+						Parent = TabScroll,
+					})
+				end
 
-                    TabLeft = New("ScrollingFrame", {
-                        AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                        BackgroundTransparency = 1,
-                        CanvasSize = UDim2.fromScale(0, 0),
-                        ScrollBarImageTransparency = 1,
-                        ScrollBarThickness = 0,
-                        Size = UDim2.new(0.5, -3, 1, 0),
-                        Parent = TabContainer,
-                    })
-                    New("UIListLayout", {
-                        Padding = UDim.new(0, 2),
-                        Parent = TabLeft,
-                    })
-                    New("UIPadding", {
-                        PaddingBottom = UDim.new(0, 2),
-                        PaddingLeft = UDim.new(0, 2),
-                        PaddingRight = UDim.new(0, 2),
-                        PaddingTop = UDim.new(0, 2),
-                        Parent = TabLeft,
-                    })
-                    do
-                        New("Frame", {
-                            BackgroundTransparency = 1,
-                            LayoutOrder = -1,
-                            Parent = TabLeft,
-                        })
-                        New("Frame", {
-                            BackgroundTransparency = 1,
-                            LayoutOrder = 1,
-                            Parent = TabLeft,
-                        })
-                    end
+				local WarningBoxHolder = New("Frame", {
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(0, 7),
+					Size = UDim2.fromScale(1, 0),
+					Visible = false,
+					Parent = TabContainer,
+				})
 
-                    TabRight = New("ScrollingFrame", {
-                        AnchorPoint = Vector2.new(1, 0),
-                        AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                        BackgroundTransparency = 1,
-                        CanvasSize = UDim2.fromScale(0, 0),
-                        Position = UDim2.fromScale(1, 0),
-                        ScrollBarImageTransparency = 1,
-                        ScrollBarThickness = 0,
-                        Size = UDim2.new(0.5, -3, 1, 0),
-                        Parent = TabContainer,
-                    })
-                    New("UIListLayout", {
-                        Padding = UDim.new(0, 2),
-                        Parent = TabRight,
-                    })
-                    New("UIPadding", {
-                        PaddingBottom = UDim.new(0, 2),
-                        PaddingLeft = UDim.new(0, 2),
-                        PaddingRight = UDim.new(0, 2),
-                        PaddingTop = UDim.new(0, 2),
-                        Parent = TabRight,
-                    })
-                    do
-                        New("Frame", {
-                            BackgroundTransparency = 1,
-                            LayoutOrder = -1,
-                            Parent = TabRight,
-                        })
-                        New("Frame", {
-                            BackgroundTransparency = 1,
-                            LayoutOrder = 1,
-                            Parent = TabRight,
-                        })
-                    end
-                end
+				local WarningBox
+				local WarningBoxOutline
+				local WarningBoxShadowOutline
+				local WarningBoxScrollingFrame
+				local WarningTitle
+				local WarningStroke
+				local WarningText
+				do
+					WarningBox = New("Frame", {
+						BackgroundColor3 = "BackgroundColor",
+						Position = UDim2.fromOffset(2, 0),
+						Size = UDim2.new(1, -5, 0, 0),
+						Parent = WarningBoxHolder,
+					})
+					table.insert(
+						Library.Corners,
+						New("UICorner", {
+							CornerRadius = UDim.new(0, WindowInfo.CornerRadius),
+							Parent = WarningBox,
+						})
+					)
+					WarningBoxOutline, WarningBoxShadowOutline = Library:AddOutline(WarningBox)
 
-                local WarningBoxHolder = New("Frame", {
-                    AutomaticSize = Enum.AutomaticSize.Y,
-                    BackgroundTransparency = 1,
-                    Position = UDim2.fromOffset(0, 7),
-                    Size = UDim2.fromScale(1, 0),
-                    Visible = false,
-                    Parent = TabContainer,
-                })
+					WarningBoxScrollingFrame = New("ScrollingFrame", {
+						BackgroundTransparency = 1,
+						BorderSizePixel = 0,
+						Size = UDim2.fromScale(1, 1),
+						CanvasSize = UDim2.new(0, 0, 0, 0),
+						ScrollBarThickness = 3,
+						ScrollingDirection = Enum.ScrollingDirection.Y,
+						Parent = WarningBox,
+					})
+					New("UIPadding", {
+						PaddingBottom = UDim.new(0, 4),
+						PaddingLeft = UDim.new(0, 6),
+						PaddingRight = UDim.new(0, 6),
+						PaddingTop = UDim.new(0, 4),
+						Parent = WarningBoxScrollingFrame,
+					})
 
-                local WarningBox
-                local WarningBoxOutline
-                local WarningBoxShadowOutline
-                local WarningBoxScrollingFrame
-                local WarningTitle
-                local WarningStroke
-                local WarningText
-                do
-                    WarningBox = New("Frame", {
-                        BackgroundColor3 = "BackgroundColor",
-                        Position = UDim2.fromOffset(2, 0),
-                        Size = UDim2.new(1, -5, 0, 0),
-                        Parent = WarningBoxHolder,
-                    })
-                    table.insert(
-                        Library.Corners,
-                        New("UICorner", {
-                            CornerRadius = UDim.new(0, WindowInfo.CornerRadius),
-                            Parent = WarningBox,
-                        })
-                    )
-                    WarningBoxOutline, WarningBoxShadowOutline = Library:AddOutline(WarningBox)
+					WarningTitle = New("TextLabel", {
+						BackgroundTransparency = 1,
+						Size = UDim2.new(1, -4, 0, 14),
+						Text = "",
+						TextColor3 = Color3.fromRGB(255, 50, 50),
+						TextSize = 14,
+						TextXAlignment = Enum.TextXAlignment.Left,
+						Parent = WarningBoxScrollingFrame,
+					})
 
-                    WarningBoxScrollingFrame = New("ScrollingFrame", {
-                        BackgroundTransparency = 1,
-                        BorderSizePixel = 0,
-                        Size = UDim2.fromScale(1, 1),
-                        CanvasSize = UDim2.new(0, 0, 0, 0),
-                        ScrollBarThickness = 3,
-                        ScrollingDirection = Enum.ScrollingDirection.Y,
-                        Parent = WarningBox,
-                    })
-                    New("UIPadding", {
-                        PaddingBottom = UDim.new(0, 4),
-                        PaddingLeft = UDim.new(0, 6),
-                        PaddingRight = UDim.new(0, 6),
-                        PaddingTop = UDim.new(0, 4),
-                        Parent = WarningBoxScrollingFrame,
-                    })
+					WarningStroke = New("UIStroke", {
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+						Color = Color3.fromRGB(169, 0, 0),
+						LineJoinMode = Enum.LineJoinMode.Miter,
+						Parent = WarningTitle,
+					})
 
-                    WarningTitle = New("TextLabel", {
-                        BackgroundTransparency = 1,
-                        Size = UDim2.new(1, -4, 0, 14),
-                        Text = "",
-                        TextColor3 = Color3.fromRGB(255, 50, 50),
-                        TextSize = 14,
-                        TextXAlignment = Enum.TextXAlignment.Left,
-                        Parent = WarningBoxScrollingFrame,
-                    })
+					WarningText = New("TextLabel", {
+						BackgroundTransparency = 1,
+						Position = UDim2.fromOffset(0, 16),
+						Size = UDim2.new(1, -4, 0, 0),
+						Text = "",
+						TextSize = 14,
+						TextWrapped = true,
+						Parent = WarningBoxScrollingFrame,
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextYAlignment = Enum.TextYAlignment.Top,
+					})
 
-                    WarningStroke = New("UIStroke", {
-                        ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
-                        Color = Color3.fromRGB(169, 0, 0),
-                        LineJoinMode = Enum.LineJoinMode.Miter,
-                        Parent = WarningTitle,
-                    })
+					New("UIStroke", {
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+						Color = "DarkColor",
+						LineJoinMode = Enum.LineJoinMode.Miter,
+						Parent = WarningText,
+					})
+				end
 
-                    WarningText = New("TextLabel", {
-                        BackgroundTransparency = 1,
-                        Position = UDim2.fromOffset(0, 16),
-                        Size = UDim2.new(1, -4, 0, 0),
-                        Text = "",
-                        TextSize = 14,
-                        TextWrapped = true,
-                        Parent = WarningBoxScrollingFrame,
-                        TextXAlignment = Enum.TextXAlignment.Left,
-                        TextYAlignment = Enum.TextYAlignment.Top,
-                    })
+				local Tab = {
+					Type = "Tab",
+					Name = Name,
+					Description = Description,
+					Connections = {},
+					Destroyed = false,
+					Window = Window,
+					Canvas = TabCanvas,
+					Container = TabContainer,
+					Scroll = TabScroll,
+					Sides = { TabScroll },
+					Sections = {},
+					WarningBox = {
+						IsNormal = false,
+						LockSize = false,
+						Visible = false,
+						Title = "WARNING",
+						Text = "",
+					},
+					Groupboxes = {},
+					Tabboxes = {},
+					DependencyGroupboxes = {},
+					SubTabs = {},
+					ActiveSubTab = nil,
+				}
 
-                    New("UIStroke", {
-                        ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
-                        Color = "DarkColor",
-                        LineJoinMode = Enum.LineJoinMode.Miter,
-                        Parent = WarningText,
-                    })
-                end
+				function Tab:GetSideContainer(Side)
+					local TargetSide = "Left"
+					local IsFull = false
 
-                local Tab = {
-                    Type = "Tab",
-                    Name = Name,
-                    Description = Description,
-                    Connections = {},
-                    Destroyed = false,
-                    Window = Window,
-                    Canvas = TabCanvas,
-                    Sides = {
-                        TabLeft,
-                        TabRight,
-                        TabFull,
-                    },
-                    WarningBox = {
-                        IsNormal = false,
-                        LockSize = false,
-                        Visible = false,
-                        Title = "WARNING",
-                        Text = "",
-                    },
-                    Groupboxes = {},
-                    Tabboxes = {},
-                    DependencyGroupboxes = {},
-                    SubTabs = {},
-                    ActiveSubTab = nil,
-                }
+					if typeof(Side) == "string" then
+						local Lower = string.lower(Side)
+						if Lower == "full" or Lower == "center" or Lower == "both" or Lower == "middle" then
+							IsFull = true
+						elseif Lower == "right" or Lower == "2" then
+							TargetSide = "Right"
+						else
+							TargetSide = "Left"
+						end
+					elseif typeof(Side) == "number" then
+						if Side == 3 then
+							IsFull = true
+						elseif Side == 2 then
+							TargetSide = "Right"
+						else
+							TargetSide = "Left"
+						end
+					end
 
-                function Tab:UpdateWarningBox(Info)
-                    if typeof(Info.IsNormal) == "boolean" then
-                        Tab.WarningBox.IsNormal = Info.IsNormal
-                    end
-                    if typeof(Info.LockSize) == "boolean" then
-                        Tab.WarningBox.LockSize = Info.LockSize
-                    end
-                    if typeof(Info.Visible) == "boolean" then
-                        Tab.WarningBox.Visible = Info.Visible
-                    end
-                    if typeof(Info.Title) == "string" then
-                        Tab.WarningBox.Title = Info.Title
-                    end
-                    if typeof(Info.Text) == "string" then
-                        Tab.WarningBox.Text = Info.Text
-                    end
+					local LastSection = Tab.Sections[#Tab.Sections]
 
-                    WarningBoxHolder.Visible = Tab.WarningBox.Visible
-                    WarningTitle.Text = Tab.WarningBox.Title
-                    WarningText.Text = Tab.WarningBox.Text
-                    Tab:Resize(true)
+					if IsFull then
+						local FullRow = New("Frame", {
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							LayoutOrder = #Tab.Sections + 1,
+							Size = UDim2.new(1, 0, 0, 0),
+							Parent = TabScroll,
+						})
+						New("UIListLayout", {
+							Padding = UDim.new(0, 6),
+							Parent = FullRow,
+						})
+						table.insert(Tab.Sections, {
+							Type = "Full",
+							Container = FullRow,
+						})
+						return FullRow
+					end
 
-                    WarningBox.BackgroundColor3 = Tab.WarningBox.IsNormal == true and Library.Scheme.BackgroundColor
-                        or Color3.fromRGB(127, 0, 0)
+					if not LastSection or LastSection.Type ~= "Columns" then
+						local Row = New("Frame", {
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							LayoutOrder = #Tab.Sections + 1,
+							Size = UDim2.new(1, 0, 0, 0),
+							Parent = TabScroll,
+						})
+						local LeftCol = New("Frame", {
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							Position = UDim2.fromOffset(0, 0),
+							Size = UDim2.new(0.5, -3, 0, 0),
+							Parent = Row,
+						})
+						New("UIListLayout", {
+							Padding = UDim.new(0, 6),
+							Parent = LeftCol,
+						})
 
-                    WarningBoxShadowOutline.Color = Tab.WarningBox.IsNormal == true and Library.Scheme.DarkColor
-                        or Color3.fromRGB(85, 0, 0)
-                    WarningBoxOutline.Color = Tab.WarningBox.IsNormal == true and Library.Scheme.OutlineColor
-                        or Color3.fromRGB(255, 50, 50)
+						local RightCol = New("Frame", {
+							AnchorPoint = Vector2.new(1, 0),
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							Position = UDim2.fromScale(1, 0),
+							Size = UDim2.new(0.5, -3, 0, 0),
+							Parent = Row,
+						})
+						New("UIListLayout", {
+							Padding = UDim.new(0, 6),
+							Parent = RightCol,
+						})
 
-                    WarningTitle.TextColor3 = Tab.WarningBox.IsNormal == true and Library.Scheme.FontColor
-                        or Color3.fromRGB(255, 50, 50)
-                    WarningStroke.Color = Tab.WarningBox.IsNormal == true and Library.Scheme.OutlineColor
-                        or Color3.fromRGB(169, 0, 0)
+						LastSection = {
+							Type = "Columns",
+							Row = Row,
+							Left = LeftCol,
+							Right = RightCol,
+						}
+						table.insert(Tab.Sections, LastSection)
+					end
 
-                    if not Library.Registry[WarningBox] then
-                        Library:AddToRegistry(WarningBox, {})
-                    end
-                    if not Library.Registry[WarningBoxShadowOutline] then
-                        Library:AddToRegistry(WarningBoxShadowOutline, {})
-                    end
-                    if not Library.Registry[WarningBoxOutline] then
-                        Library:AddToRegistry(WarningBoxOutline, {})
-                    end
-                    if not Library.Registry[WarningTitle] then
-                        Library:AddToRegistry(WarningTitle, {})
-                    end
-                    if not Library.Registry[WarningStroke] then
-                        Library:AddToRegistry(WarningStroke, {})
-                    end
+					if TargetSide == "Right" then
+						return LastSection.Right
+					end
+					return LastSection.Left
+				end
 
-                    Library.Registry[WarningBox].BackgroundColor3 = function()
-                        return Tab.WarningBox.IsNormal == true and Library.Scheme.BackgroundColor or Color3.fromRGB(127, 0, 0)
-                    end
+				function Tab:UpdateWarningBox(Info)
+					if typeof(Info.IsNormal) == "boolean" then
+						Tab.WarningBox.IsNormal = Info.IsNormal
+					end
+					if typeof(Info.LockSize) == "boolean" then
+						Tab.WarningBox.LockSize = Info.LockSize
+					end
+					if typeof(Info.Visible) == "boolean" then
+						Tab.WarningBox.Visible = Info.Visible
+					end
+					if typeof(Info.Title) == "string" then
+						Tab.WarningBox.Title = Info.Title
+					end
+					if typeof(Info.Text) == "string" then
+						Tab.WarningBox.Text = Info.Text
+					end
 
-                    Library.Registry[WarningBoxShadowOutline].Color = function()
-                        return Tab.WarningBox.IsNormal == true and Library.Scheme.DarkColor or Color3.fromRGB(85, 0, 0)
-                    end
+					WarningBoxHolder.Visible = Tab.WarningBox.Visible
+					WarningTitle.Text = Tab.WarningBox.Title
+					WarningText.Text = Tab.WarningBox.Text
+					Tab:Resize(true)
 
-                    Library.Registry[WarningBoxOutline].Color = function()
-                        return Tab.WarningBox.IsNormal == true and Library.Scheme.OutlineColor or Color3.fromRGB(255, 50, 50)
-                    end
+					WarningBox.BackgroundColor3 = Tab.WarningBox.IsNormal == true and Library.Scheme.BackgroundColor or Color3.fromRGB(127, 0, 0)
+					WarningBoxShadowOutline.Color = Tab.WarningBox.IsNormal == true and Library.Scheme.DarkColor or Color3.fromRGB(85, 0, 0)
+					WarningBoxOutline.Color = Tab.WarningBox.IsNormal == true and Library.Scheme.OutlineColor or Color3.fromRGB(255, 50, 50)
+					WarningTitle.TextColor3 = Tab.WarningBox.IsNormal == true and Library.Scheme.FontColor or Color3.fromRGB(255, 50, 50)
+					WarningStroke.Color = Tab.WarningBox.IsNormal == true and Library.Scheme.OutlineColor or Color3.fromRGB(169, 0, 0)
 
-                    Library.Registry[WarningTitle].TextColor3 = function()
-                        return Tab.WarningBox.IsNormal == true and Library.Scheme.FontColor or Color3.fromRGB(255, 50, 50)
-                    end
+					if not Library.Registry[WarningBox] then
+						Library:AddToRegistry(WarningBox, {})
+					end
+					if not Library.Registry[WarningBoxShadowOutline] then
+						Library:AddToRegistry(WarningBoxShadowOutline, {})
+					end
+					if not Library.Registry[WarningBoxOutline] then
+						Library:AddToRegistry(WarningBoxOutline, {})
+					end
+					if not Library.Registry[WarningTitle] then
+						Library:AddToRegistry(WarningTitle, {})
+					end
+					if not Library.Registry[WarningStroke] then
+						Library:AddToRegistry(WarningStroke, {})
+					end
 
-                    Library.Registry[WarningStroke].Color = function()
-                        return Tab.WarningBox.IsNormal == true and Library.Scheme.OutlineColor or Color3.fromRGB(169, 0, 0)
-                    end
-                end
+					Library.Registry[WarningBox].BackgroundColor3 = function()
+						return Tab.WarningBox.IsNormal == true and Library.Scheme.BackgroundColor or Color3.fromRGB(127, 0, 0)
+					end
+					Library.Registry[WarningBoxShadowOutline].Color = function()
+						return Tab.WarningBox.IsNormal == true and Library.Scheme.DarkColor or Color3.fromRGB(85, 0, 0)
+					end
+					Library.Registry[WarningBoxOutline].Color = function()
+						return Tab.WarningBox.IsNormal == true and Library.Scheme.OutlineColor or Color3.fromRGB(255, 50, 50)
+					end
+					Library.Registry[WarningTitle].TextColor3 = function()
+						return Tab.WarningBox.IsNormal == true and Library.Scheme.FontColor or Color3.fromRGB(255, 50, 50)
+					end
+					Library.Registry[WarningStroke].Color = function()
+						return Tab.WarningBox.IsNormal == true and Library.Scheme.OutlineColor or Color3.fromRGB(169, 0, 0)
+					end
+				end
 
-                function Tab:RefreshSides()
-                    local off = Tab:GetContentOffset()
-                    TabLeft.Position = UDim2.new(0, 0, 0, off)
-                    TabLeft.Size = UDim2.new(0.5, -3, 1, -off)
+				function Tab:RefreshSides()
+					local off = Tab:GetContentOffset()
+					TabScroll.Position = UDim2.new(0, 0, 0, off)
+					TabScroll.Size = UDim2.new(1, 0, 1, -off)
 
-                    TabRight.Position = UDim2.new(1, 0, 0, off)
-                    TabRight.Size = UDim2.new(0.5, -3, 1, -off)
-
-                    TabFull.Position = UDim2.new(0, 0, 0, off)
-                    TabFull.Size = UDim2.new(1, 0, 1, -off)
-
-                    local hasL = #TabLeft:GetChildren() > 4
-                    local hasR = #TabRight:GetChildren() > 4
-                    local hasF = #TabFull:GetChildren() > 4
-
-                    TabLeft.Visible = hasL or (not hasF)
-                    TabRight.Visible = hasR or (not hasF)
-                    TabFull.Visible = hasF
-
-                    if hasF and not hasL and not hasR then
-                        TabLeft.Visible = false
-                        TabRight.Visible = false
-                        TabFull.ZIndex = 2
-                    else
-                        TabFull.ZIndex = 1
-                    end
-
-                    if Tab.SubTabs then
-                        for _, st in Tab.SubTabs do
-                            st:RefreshSides()
-                        end
-                    end
-                end
+					if Tab.SubTabs then
+						for _, st in pairs(Tab.SubTabs) do
+							st:RefreshSides()
+						end
+					end
+				end
 
                 function Tab:Resize(ResizeWarningBox: boolean?)
                     if ResizeWarningBox then
@@ -14830,14 +14826,21 @@ function Library:CreateWindow(WindowInfo)
                         s = (sl == "right" and 2) or 1
                     end
 
-                    local BoxHolder = New("Frame", {
-                        AutomaticSize = Enum.AutomaticSize.Y,
-                        BackgroundTransparency = 1,
-                        Size = UDim2.fromScale(1, 0),
-                        Parent = if ParentObj.Type == "Groupbox" then ParentObj.Container else (s == 2 and TabRight or TabLeft),
-                    })
-                    New("UIListLayout", { Padding = UDim.new(0, 6), Parent = BoxHolder })
-                    New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = BoxHolder })
+                    local TargetContainer
+					if ParentObj.Type == "Groupbox" then
+						TargetContainer = ParentObj.Container
+					else
+						TargetContainer = ParentObj:GetSideContainer(Info.Side or 1)
+					end
+
+					local BoxHolder = New("Frame", {
+						AutomaticSize = Enum.AutomaticSize.Y,
+						BackgroundTransparency = 1,
+						Size = UDim2.fromScale(1, 0),
+						Parent = TargetContainer,
+					})
+					New("UIListLayout", { Padding = UDim.new(0, 6), Parent = BoxHolder })
+					New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = BoxHolder })
 
                     local TabboxHolder = New("Frame", {
                         BackgroundColor3 = "BackgroundColor",
@@ -15087,32 +15090,24 @@ function Library:CreateWindow(WindowInfo)
                 end
 
                 function Tab:AddGroupbox(i)
-                    local o = self or Tab
-                    i = Library:Validate(i, Templates.Groupbox)
+					local o = self or Tab
+					i = Library:Validate(i, Templates.Groupbox)
 
-                    local s = i.Side or 1
-                    local tSide = o.Sides[1]
-                    if typeof(s) == "string" then
-                        local sl = s:lower()
-                        if sl == "left" then
-                            tSide = o.Sides[1]
-                        elseif sl == "right" then
-                            tSide = o.Sides[2]
-                        elseif sl == "full" or sl == "center" or sl == "both" or sl == "middle" then
-                            tSide = o.Sides[3]
-                        end
-                    elseif typeof(s) == "number" then
-                        tSide = o.Sides[s] or o.Sides[1]
-                    end
+					local TargetContainer
+					if o.Type == "Groupbox" then
+						TargetContainer = o.Container
+					else
+						TargetContainer = o:GetSideContainer(i.Side)
+					end
 
-                    local bh = New("Frame", {
-                        AutomaticSize = Enum.AutomaticSize.Y,
-                        BackgroundTransparency = 1,
-                        Size = UDim2.fromScale(1, 0),
-                        Parent = tSide,
-                    })
-                    New("UIListLayout", { Padding = UDim.new(0, 6), Parent = bh })
-                    New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = bh })
+					local bh = New("Frame", {
+						AutomaticSize = Enum.AutomaticSize.Y,
+						BackgroundTransparency = 1,
+						Size = UDim2.fromScale(1, 0),
+						Parent = TargetContainer,
+					})
+					New("UIListLayout", { Padding = UDim.new(0, 6), Parent = bh })
+					New("UIPadding", { PaddingBottom = UDim.new(0, 4), PaddingTop = UDim.new(0, 4), Parent = bh })
 
                     local gh = New("Frame", {
                         BackgroundColor3 = "BackgroundColor",
@@ -15896,118 +15891,67 @@ function Library:CreateWindow(WindowInfo)
                     })
 
                     local subCanvas = New("CanvasGroup", {
-                        BackgroundTransparency = 1,
-                        GroupTransparency = 0,
-                        Size = UDim2.fromScale(1, 1),
-                        Visible = false,
-                        Parent = TabContainer,
-                    })
+						BackgroundTransparency = 1,
+						GroupTransparency = 0,
+						Size = UDim2.fromScale(1, 1),
+						Visible = false,
+						Parent = TabContainer,
+					})
 
-                    local subLeft = New("ScrollingFrame", {
-                        AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                        BackgroundTransparency = 1,
-                        CanvasSize = UDim2.fromScale(0, 0),
-                        ScrollBarImageTransparency = 1,
-                        ScrollBarThickness = 0,
-                        Size = UDim2.new(0.5, -3, 1, 0),
-                        Parent = subCanvas,
-                    })
-                    local subRight = New("ScrollingFrame", {
-                        AnchorPoint = Vector2.new(1, 0),
-                        AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                        BackgroundTransparency = 1,
-                        CanvasSize = UDim2.fromScale(0, 0),
-                        Position = UDim2.fromScale(1, 0),
-                        ScrollBarImageTransparency = 1,
-                        ScrollBarThickness = 0,
-                        Size = UDim2.new(0.5, -3, 1, 0),
-                        Parent = subCanvas,
-                    })
-                    local subFull = New("ScrollingFrame", {
-                        AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                        BackgroundTransparency = 1,
-                        CanvasSize = UDim2.fromScale(0, 0),
-                        ScrollBarImageTransparency = 1,
-                        ScrollBarThickness = 0,
-                        Size = UDim2.new(1, 0, 1, 0),
-                        Parent = subCanvas,
-                    })
+					local subScroll = New("ScrollingFrame", {
+						AutomaticCanvasSize = Enum.AutomaticSize.Y,
+						BackgroundTransparency = 1,
+						CanvasSize = UDim2.fromScale(0, 0),
+						ScrollBarImageTransparency = 1,
+						ScrollBarThickness = 0,
+						Size = UDim2.new(1, 0, 1, 0),
+						Parent = subCanvas,
+					})
+					New("UIListLayout", {
+						Padding = UDim.new(0, 6),
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Parent = subScroll,
+					})
+					New("UIPadding", {
+						PaddingBottom = UDim.new(0, 4),
+						PaddingLeft = UDim.new(0, 2),
+						PaddingRight = UDim.new(0, 2),
+						PaddingTop = UDim.new(0, 2),
+						Parent = subScroll,
+					})
 
-                    for _, side in { subLeft, subRight, subFull } do
-                        New("UIListLayout", {
-                            Padding = UDim.new(0, 2),
-                            Parent = side,
-                        })
-                        New("UIPadding", {
-                            PaddingBottom = UDim.new(0, 2),
-                            PaddingLeft = UDim.new(0, 2),
-                            PaddingRight = UDim.new(0, 2),
-                            PaddingTop = UDim.new(0, 2),
-                            Parent = side,
-                        })
-                        New("Frame", {
-                            BackgroundTransparency = 1,
-                            LayoutOrder = -1,
-                            Parent = side,
-                        })
-                        New("Frame", {
-                            BackgroundTransparency = 1,
-                            LayoutOrder = 1,
-                            Parent = side,
-                        })
-                    end
+					local subTab = {
+						Type = "SubTab",
+						Name = sName,
+						Connections = {},
+						Destroyed = false,
+						Window = Window,
+						Tab = Tab,
+						Canvas = subCanvas,
+						Scroll = subScroll,
+						Button = btn,
+						Sides = { subScroll },
+						Sections = {},
+						Groupboxes = {},
+						Tabboxes = {},
+						DependencyGroupboxes = {},
+					}
 
-                    local subTab = {
-                        Type = "SubTab",
-                        Name = sName,
-                        Connections = {},
-                        Destroyed = false,
-                        Window = Window,
-                        Tab = Tab,
-                        Canvas = subCanvas,
-                        Button = btn,
-                        Sides = { subLeft, subRight, subFull },
-                        Groupboxes = {},
-                        Tabboxes = {},
-                        DependencyGroupboxes = {},
-                    }
+					subTab.GetSideContainer = Tab.GetSideContainer
+					subTab.AddGroupbox = Tab.AddGroupbox
+					subTab.AddLeftGroupbox = Tab.AddLeftGroupbox
+					subTab.AddRightGroupbox = Tab.AddRightGroupbox
+					subTab.AddFullGroupbox = Tab.AddFullGroupbox
+					subTab.AddCenterGroupbox = Tab.AddFullGroupbox
+					subTab.AddTabbox = AddTabbox
+					subTab.AddLeftTabbox = Tab.AddLeftTabbox
+					subTab.AddRightTabbox = Tab.AddRightTabbox
 
-                    subTab.AddGroupbox = Tab.AddGroupbox
-                    subTab.AddLeftGroupbox = Tab.AddLeftGroupbox
-                    subTab.AddRightGroupbox = Tab.AddRightGroupbox
-                    subTab.AddFullGroupbox = Tab.AddFullGroupbox
-                    subTab.AddCenterGroupbox = Tab.AddFullGroupbox
-                    subTab.AddTabbox = AddTabbox
-                    subTab.AddLeftTabbox = Tab.AddLeftTabbox
-                    subTab.AddRightTabbox = Tab.AddRightTabbox
-
-                    function subTab:RefreshSides()
-                        local off = Tab:GetContentOffset()
-                        subLeft.Position = UDim2.new(0, 0, 0, off)
-                        subLeft.Size = UDim2.new(0.5, -3, 1, -off)
-
-                        subRight.Position = UDim2.new(1, 0, 0, off)
-                        subRight.Size = UDim2.new(0.5, -3, 1, -off)
-
-                        subFull.Position = UDim2.new(0, 0, 0, off)
-                        subFull.Size = UDim2.new(1, 0, 1, -off)
-
-                        local hasL = #subLeft:GetChildren() > 4
-                        local hasR = #subRight:GetChildren() > 4
-                        local hasF = #subFull:GetChildren() > 4
-
-                        subLeft.Visible = hasL or (not hasF)
-                        subRight.Visible = hasR or (not hasF)
-                        subFull.Visible = hasF
-
-                        if hasF and not hasL and not hasR then
-                            subLeft.Visible = false
-                            subRight.Visible = false
-                            subFull.ZIndex = 2
-                        else
-                            subFull.ZIndex = 1
-                        end
-                    end
+					function subTab:RefreshSides()
+						local off = Tab:GetContentOffset()
+						subScroll.Position = UDim2.new(0, 0, 0, off)
+						subScroll.Size = UDim2.new(1, 0, 1, -off)
+					end
 
                     function subTab:Resize()
                         subTab:RefreshSides()
