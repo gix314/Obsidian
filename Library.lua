@@ -1403,6 +1403,7 @@ local function IsCustomAssetIcon(Icon: string, IncludeAssetId: boolean)
 	return typeof(Icon) == "string" and (Icon:match("^content://") or (Icon:match("^rbxasset://%x+/") or Icon:match("^rbxasset://[^/]+/")) or (IncludeAssetId == true and Icon:match("^rbxassetid://")))
 end
 
+local New
 local FetchIcons = false
 local Icons = nil
 
@@ -1603,21 +1604,21 @@ local function FillInstance(Table: { [string]: any }, Instance: GuiObject)
     end
 end
 
-local function New(ClassName: string, Properties: { [string]: any }): any
-    local Instance = Instance.new(ClassName)
+New = function(ClassName, Properties)
+	local Instance = Instance.new(ClassName)
 
-    if Templates[ClassName] then
-        FillInstance(Templates[ClassName], Instance)
-    end
-    FillInstance(Properties, Instance)
+	if Templates[ClassName] then
+		FillInstance(Templates[ClassName], Instance)
+	end
+	FillInstance(Properties, Instance)
 
-    if Properties["Parent"] and not Properties["ZIndex"] then
-        pcall(function()
-            Instance.ZIndex = Properties.Parent.ZIndex
-        end)
-    end
+	if Properties["Parent"] and not Properties["ZIndex"] then
+		pcall(function()
+			Instance.ZIndex = Properties.Parent.ZIndex
+		end)
+	end
 
-    return Instance
+	return Instance
 end
 
 --// Main Instances \\-
