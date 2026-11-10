@@ -1997,6 +1997,12 @@ function Library:BindHover(Button: GuiObject, HoverCallback: (boolean) -> ())
     end)
 end
 
+function Library:Tween(Target: Instance, TweenInfoData: TweenInfo?, Properties: { [string]: any }): Tween
+    local Tween = TweenService:Create(Target, TweenInfoData or Library.TweenInfo, Properties)
+    Tween:Play()
+    return Tween
+end
+
 function GetOverlappingDraggable(UI: GuiObject, TargetPos: Vector2?)
     local Pos1 = TargetPos or UI.AbsolutePosition
     local Size1 = UI.AbsoluteSize
@@ -8446,7 +8452,26 @@ do
 
             SetBallActive(true)
 
-            while IsDragInput(inp) and not Slider.Destroyed do
+            local DragConn
+            local DragActive = true
+            DragConn = UserInputService.InputEnded:Connect(function(endInput)
+                if endInput == inp or endInput.UserInputType == inp.UserInputType then
+                    DragActive = false
+                    if DragConn then
+                        DragConn:Disconnect()
+                        DragConn = nil
+                    end
+                end
+            end)
+
+            while DragActive and IsDragInput(inp) and not Slider.Destroyed do
+                if not (Bar and Bar.Parent and ScreenGui and ScreenGui.Parent) then
+                    break
+                end
+                if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) and not (Library.IsMobile and UserInputService:IsMouseButtonPressed(Enum.UserInputType.Touch)) then
+                    break
+                end
+
                 local loc = Mouse.X
                 local sc = math.clamp((loc - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
 
@@ -8459,6 +8484,11 @@ do
                 end
 
                 RunService.RenderStepped:Wait()
+            end
+
+            if DragConn then
+                DragConn:Disconnect()
+                DragConn = nil
             end
 
             for _, side in Library:GetActiveSides() do
@@ -13202,50 +13232,36 @@ function Library:CreateWindow(WindowInfo)
 			Parent = HeaderButtons,
 		})
 
-		local SettingsButton = New("ImageButton", {
-			AutoButtonColor = false,
-			BackgroundTransparency = 1,
+		local SettingsButton = Library:CreateIcon(SettingsIcon, {
 			ImageColor3 = "FontColor",
 			LayoutOrder = 1,
 			Size = UDim2.fromOffset(18, 18),
 			Visible = false,
 			ZIndex = 2,
 			Parent = HeaderButtons,
-		})
-		if SettingsIcon then
-			Library:ApplyLucideIcon(SettingsButton, SettingsIcon)
-		end
+		}, true)
 
-		local CollapseButton = New("ImageButton", {
-			AutoButtonColor = false,
-			BackgroundTransparency = 1,
+		local CollapseButton = Library:CreateIcon(ArrowIcon, {
 			ImageColor3 = "FontColor",
 			LayoutOrder = 2,
+			Rotation = 180,
 			Size = UDim2.fromOffset(18, 18),
 			ZIndex = 2,
 			Parent = HeaderButtons,
-		})
-		if ArrowIcon then
-			Library:ApplyLucideIcon(CollapseButton, ArrowIcon, 180)
-		end
+		}, true)
 
 		local SettingsFrame, SettingsContainer, _, _, SettingsLabelPadding = Library:AddDraggableMenu("Visible Keybinds")
 		SettingsFrame.Visible = false
 		SettingsLabelPadding.PaddingRight = UDim.new(0, 34)
 
-		local CloseSettingsButton = New("ImageButton", {
+		local CloseSettingsButton = Library:CreateIcon(CloseIcon, {
 			AnchorPoint = Vector2.new(1, 0.5),
-			AutoButtonColor = false,
-			BackgroundTransparency = 1,
 			ImageColor3 = "FontColor",
 			Position = UDim2.new(1, -8, 0, 17),
 			Size = UDim2.fromOffset(18, 18),
 			ZIndex = 2,
 			Parent = SettingsFrame,
-		})
-		if CloseIcon then
-			Library:ApplyLucideIcon(CloseSettingsButton, CloseIcon)
-		end
+		}, true)
 
 		local KeybindMenu = {
 			VisibilityControl = false,
@@ -13305,16 +13321,13 @@ function Library:CreateWindow(WindowInfo)
 						Parent = Checkbox,
 					})
 
-					local CheckImage = New("ImageLabel", {
+					Library:CreateIcon(CheckIcon, {
 						ImageColor3 = "FontColor",
 						ImageTransparency = Visible and 0 or 1,
 						Position = UDim2.fromOffset(2, 2),
 						Size = UDim2.new(1, -4, 1, -4),
 						Parent = Checkbox,
 					})
-					if CheckIcon then
-						Library:ApplyLucideIcon(CheckImage, CheckIcon)
-					end
 
 					Holder.MouseButton1Click:Connect(function()
 						local Picker = Options[Idx]
@@ -13547,14 +13560,10 @@ function Library:CreateWindow(WindowInfo)
 		})
 
 		if WindowInfo.Icon then
-			local Icon = Library:GetCustomIcon(WindowInfo.Icon)
-			WindowIcon = New("ImageLabel", {
+			WindowIcon = Library:CreateIcon(Library:GetCustomIcon(WindowInfo.Icon), {
 				Size = if IsCompact then UDim2.fromOffset(24, 24) else WindowInfo.IconSize,
 				Parent = TitleHolder,
 			})
-			if Icon then
-				Library:ApplyLucideIcon(WindowIcon, Icon)
-			end
 		else
 			WindowIcon = New("TextLabel", {
 				BackgroundTransparency = 1,
