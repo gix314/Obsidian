@@ -1639,13 +1639,6 @@ function Library:ApplyIcon(Target: GuiObject, Icon: any): GuiObject
     return Target
 end
 
-function Library:ApplyLucideIcon(ImageGui: ImageLabel | ImageButton, Icon: any, Rotation: number?)
-    warn("Obsidian:ApplyLucideIcon is deprecated, please use Obsidian:CreateIcon or Obsidian:ApplyIcon instead.")
-
-    ImageGui.Rotation = Rotation or ImageGui.Rotation
-    FillInstance(ImageContent(Icon), ImageGui)
-end
-
 --// Main Instances \\-
 local function SafeParentUI(Instance: Instance, Parent: Instance | () -> Instance)
     local success, _error = pcall(function()
@@ -5623,16 +5616,13 @@ do
 				Parent = FooterBackground,
 			})
 
-			local ResizeGrabberIcon = New("ImageLabel", {
+			Library:CreateIcon(ResizeIcon, {
 				ImageColor3 = "FontColor",
 				ImageTransparency = 0.5,
 				Position = UDim2.fromOffset(2, 2),
 				Size = UDim2.new(1, -4, 1, -4),
 				Parent = ResizeGrabber,
 			})
-			if ResizeIcon then
-				Library:ApplyLucideIcon(ResizeGrabberIcon, ResizeIcon)
-			end
 
 			table.insert(ColorPicker.Connections, ResizeGrabber.InputBegan:Connect(function(Input)
 				Library.CantDragForced = true
@@ -13485,9 +13475,7 @@ function Library:CreateWindow(WindowInfo)
 			Visible = false,
 			Parent = ScreenGui,
 		})
-		if BackgroundIcon then
-			Library:ApplyLucideIcon(BackgroundImage, BackgroundIcon)
-		end
+		FillInstance(ImageContent(BackgroundIcon), BackgroundImage)
 
 		table.insert(
 			Library.Corners,
@@ -14637,7 +14625,7 @@ function Library:CreateWindow(WindowInfo)
 			local BackgroundIcon = Library:GetCustomIcon(Image)
 			if BackgroundIcon then
 				ValidIcon = true
-				Library:ApplyLucideIcon(BackgroundImage, BackgroundIcon)
+				FillInstance(ImageContent(BackgroundIcon), BackgroundImage)
 			elseif Image:match("http://") or Image:match("https://") then
 				local RawFileName = Image:match("(.+)%..+$")
 				local _, Domain = Image:match("^(https?://)([^/]+)")
@@ -14665,18 +14653,14 @@ function Library:CreateWindow(WindowInfo)
 							CustomImageManager.DownloadAsset(FileName, true)
 						end
 
-						BackgroundImage.Image = CustomImageManager.GetAsset(FileName)
-						BackgroundImage.ImageRectOffset = Vector2.zero
-						BackgroundImage.ImageRectSize = Vector2.zero
+						FillInstance(ImageContent({ Url = CustomImageManager.GetAsset(FileName) }), BackgroundImage)
 					end
 				end
 			end
 		end
 
 		if not ValidIcon then
-			BackgroundImage.Image = ""
-			BackgroundImage.ImageRectOffset = Vector2.zero
-			BackgroundImage.ImageRectSize = Vector2.zero
+			FillInstance(ImageContent(nil), BackgroundImage)
 		end
 
 		HasBackgroundImage = ValidIcon
