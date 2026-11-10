@@ -11542,421 +11542,410 @@ function Library:SetNotifySide(Side: string)
 end
 
 function Library:Notify(...)
-	local Data = {}
-	local Info = select(1, ...)
+    local Data = {}
+    local Info = select(1, ...)
 
-	if typeof(Info) == "table" then
-		Data.Title = Info.Title and tostring(Info.Title) or nil
-		Data.TitleColor = Info.TitleColor
-		Data.Description = tostring(Info.Description)
-		Data.DescriptionColor = Info.DescriptionColor
-		Data.Time = Info.Time or 5
-		Data.SoundId = if Info.SoundId ~= nil then Info.SoundId else Library.NotificationSound
-		Data.Steps = Info.Steps
-		Data.Persist = Info.Persist
-		Data.Type = Info.Type
-		local TypeKey = typeof(Data.Type) == "string" and (Data.Type:sub(1, 1):upper() .. Data.Type:sub(2):lower()) or nil
+    if typeof(Info) == "table" then
+        Data.Title = Info.Title and tostring(Info.Title) or nil
+        Data.TitleColor = Info.TitleColor
+        Data.Description = tostring(Info.Description)
+        Data.DescriptionColor = Info.DescriptionColor
+        Data.Time = Info.Time or 5
+        Data.SoundId = if Info.SoundId ~= nil then Info.SoundId else Library.NotificationSound
+        Data.Steps = Info.Steps
+        Data.Persist = Info.Persist
+        Data.Type = Info.Type
+        local TypeKey = typeof(Data.Type) == "string" and (Data.Type:sub(1, 1):upper() .. Data.Type:sub(2):lower()) or nil
 
-		Data.Icon = Info.Icon or (TypeKey and Library.NotificationTypeIcons[TypeKey]) or (Data.Type and Library.NotificationTypeIcons[Data.Type])
-		Data.BigIcon = Info.BigIcon
-		Data.IconColor = Info.IconColor or (TypeKey and Library.NotificationTypeColors[TypeKey]) or (Data.Type and Library.NotificationTypeColors[Data.Type])
+        Data.Icon = Info.Icon or (TypeKey and Library.NotificationTypeIcons[TypeKey]) or (Data.Type and Library.NotificationTypeIcons[Data.Type])
+        Data.BigIcon = Info.BigIcon
+        Data.IconColor = Info.IconColor or (TypeKey and Library.NotificationTypeColors[TypeKey]) or (Data.Type and Library.NotificationTypeColors[Data.Type])
 
-		if not Data.Title and Data.Type then
-			Data.Title = TypeKey or tostring(Data.Type)
-		end
+        if not Data.Title and Data.Type then
+            Data.Title = TypeKey or tostring(Data.Type)
+        end
 
-		Data.Callback = typeof(Info.Callback) == "function" and Info.Callback or nil
-		Data.Closable = Info.Closable == true
-		Data.Volume = tonumber(Info.Volume) or 3
-	else
-		Data.Description = tostring(Info)
-		Data.Time = select(2, ...) or 5
-		Data.SoundId = select(3, ...) or Library.NotificationSound
-		Data.Volume = select(4, ...) or 3
-	end
-	Data.Destroyed = false
+        Data.Callback = typeof(Info.Callback) == "function" and Info.Callback or nil
+        Data.Closable = Info.Closable == true
+        Data.Volume = tonumber(Info.Volume) or 3
+    else
+        Data.Description = tostring(Info)
+        Data.Time = select(2, ...) or 5
+        Data.SoundId = select(3, ...) or Library.NotificationSound
+        Data.Volume = select(4, ...) or 3
+    end
+    Data.Destroyed = false
 
-	local TypeColor = Data.Type and (Library.NotificationTypeColors[Data.Type] or (Data.Title and Library.NotificationTypeColors[Data.Title]))
-	if TypeColor then
-		if Data.Title and Data.Title ~= "nil" then
-			Data.TitleColor = Data.TitleColor or TypeColor
-		else
-			Data.DescriptionColor = Data.DescriptionColor or TypeColor
-		end
-	end
+    local TypeColor = Data.Type and (Library.NotificationTypeColors[Data.Type] or (Data.Title and Library.NotificationTypeColors[Data.Title]))
+    if TypeColor then
+        if Data.Title and Data.Title ~= "nil" then
+            Data.TitleColor = Data.TitleColor or TypeColor
+        else
+            Data.DescriptionColor = Data.DescriptionColor or TypeColor
+        end
+    end
 
-	local DeletedInstance = false
-	local DeleteConnection = nil
-	if typeof(Data.Time) == "Instance" then
-		DeleteConnection = Data.Time.Destroying:Connect(function()
-			DeletedInstance = true
-			DeleteConnection:Disconnect()
-			DeleteConnection = nil
-		end)
-	end
+    local DeletedInstance = false
+    local DeleteConnection = nil
+    if typeof(Data.Time) == "Instance" then
+        DeleteConnection = Data.Time.Destroying:Connect(function()
+            DeletedInstance = true
+            DeleteConnection:Disconnect()
+            DeleteConnection = nil
+        end)
+    end
 
-	local FakeBackground = New("Frame", {
-		AnchorPoint = Library.NotifySide:lower() == "left" and Vector2.new(0, 0) or Vector2.new(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(0, 0),
-		Visible = false,
-		Parent = NotificationArea,
-	})
+    local IsLeft = Library.NotifySide:lower() == "left"
+    local FakeBackground = New("Frame", {
+        AnchorPoint = IsLeft and Vector2.new(0, 0) or Vector2.new(1, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Size = UDim2.fromOffset(0, 0),
+        Visible = false,
+        Parent = NotificationArea,
+    })
 
-	local Holder = New("Frame", {
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = "MainColor",
-		Position = Library.NotifySide:lower() == "left" and UDim2.new(-1, -8, 0, 0) or UDim2.new(1, 8, 0, 0),
-		Size = UDim2.new(1, 0, 0, 0),
-		ZIndex = 5,
-		Parent = FakeBackground,
-	})
-	table.insert(
-		Library.Corners,
-		New("UICorner", {
-			CornerRadius = UDim.new(0, Library.CornerRadius),
-			Parent = Holder,
-		})
-	)
-	Library:AddOutline(Holder)
+    local Holder = New("Frame", {
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = "MainColor",
+        Position = IsLeft and UDim2.new(-1, -8, 0, 0) or UDim2.new(1, 8, 0, 0),
+        Size = UDim2.new(1, 0, 0, 0),
+        ZIndex = 5,
+        Parent = FakeBackground,
+    })
+    table.insert(
+        Library.Corners,
+        New("UICorner", {
+            CornerRadius = UDim.new(0, Library.CornerRadius),
+            Parent = Holder,
+        })
+    )
+    Library:AddOutline(Holder)
 
-	local ContentHolder = New("Frame", {
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 0),
-		Parent = Holder,
-	})
-	New("UIListLayout", {
-		Padding = UDim.new(0, 4),
-		Parent = ContentHolder,
-	})
-	New("UIPadding", {
-		PaddingBottom = UDim.new(0, 8),
-		PaddingLeft = UDim.new(0, 8),
-		PaddingRight = UDim.new(0, 8),
-		PaddingTop = UDim.new(0, 8),
-		Parent = ContentHolder,
-	})
+    local ContentHolder = New("Frame", {
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 0),
+        Parent = Holder,
+    })
+    New("UIListLayout", {
+        Padding = UDim.new(0, 4),
+        Parent = ContentHolder,
+    })
+    New("UIPadding", {
+        PaddingBottom = UDim.new(0, 8),
+        PaddingLeft = UDim.new(0, 8),
+        PaddingRight = UDim.new(0, 8),
+        PaddingTop = UDim.new(0, 8),
+        Parent = ContentHolder,
+    })
 
-	local CloseButton
-	if Data.Closable then
-		CloseButton = New("ImageButton", {
-			AnchorPoint = Vector2.new(1, 0),
-			BackgroundTransparency = 1,
-			ImageColor3 = "FontColor",
-			ImageTransparency = 0.5,
-			Position = UDim2.new(1, -8, 0, 8),
-			Size = UDim2.fromOffset(14, 14),
-			ZIndex = 6,
-			Parent = Holder,
-		})
-		if CloseIcon then
-			Library:ApplyLucideIcon(CloseButton, CloseIcon)
-		end
+    local CloseButton
+    if Data.Closable then
+        CloseButton = Library:CreateIcon(CloseIcon, {
+            AnchorPoint = Vector2.new(1, 0),
+            ImageColor3 = "FontColor",
+            ImageTransparency = 0.5,
+            Position = UDim2.new(1, -8, 0, 8),
+            Size = UDim2.fromOffset(14, 14),
+            ZIndex = 6,
+            Parent = Holder,
+        }, true)
 
-		CloseButton.MouseEnter:Connect(function()
-			TweenService:Create(CloseButton, Library.TweenInfo, {
-				ImageTransparency = 0,
-			}):Play()
-		end)
-		CloseButton.MouseLeave:Connect(function()
-			TweenService:Create(CloseButton, Library.TweenInfo, {
-				ImageTransparency = 0.5,
-			}):Play()
-		end)
-		CloseButton.MouseButton1Click:Connect(function()
-			Data:Destroy("user")
-		end)
-	end
+        CloseButton.MouseEnter:Connect(function()
+            TweenIcon(CloseButton, { ImageTransparency = 0 })
+        end)
+        CloseButton.MouseLeave:Connect(function()
+            TweenIcon(CloseButton, { ImageTransparency = 0.5 })
+        end)
+        CloseButton.MouseButton1Click:Connect(function()
+            Data:Destroy("user")
+        end)
+    end
 
-	local ContentContainer = New("Frame", {
-		BackgroundTransparency = 1,
-		AutomaticSize = Enum.AutomaticSize.XY,
-		Size = UDim2.fromOffset(0, 0),
-		Parent = ContentHolder,
-	})
+    local ContentContainer = New("Frame", {
+        BackgroundTransparency = 1,
+        AutomaticSize = Enum.AutomaticSize.XY,
+        Size = UDim2.fromOffset(0, 0),
+        Parent = ContentHolder,
+    })
 
-	if Data.BigIcon then
-		New("UIListLayout", {
-			Padding = UDim.new(0, 8),
-			FillDirection = Enum.FillDirection.Horizontal,
-			VerticalAlignment = Enum.VerticalAlignment.Center,
-			Parent = ContentContainer,
-		})
-	end
+    if Data.BigIcon then
+        New("UIListLayout", {
+            Padding = UDim.new(0, 8),
+            FillDirection = Enum.FillDirection.Horizontal,
+            VerticalAlignment = Enum.VerticalAlignment.Center,
+            Parent = ContentContainer,
+        })
+    end
 
-	local BigIconLabel
-	if Data.BigIcon then
-		local ParsedIcon = Library:GetCustomIcon(Data.BigIcon)
-		if ParsedIcon then
-			BigIconLabel = New("ImageLabel", {
-				BackgroundTransparency = 1,
-				Size = UDim2.fromOffset(24, 24),
-				ImageColor3 = Data.IconColor or "AccentColor",
-				Parent = ContentContainer,
-			})
-			Library:ApplyLucideIcon(BigIconLabel, ParsedIcon)
-		end
-	end
+    local BigIconLabel
+    if Data.BigIcon then
+        local ParsedIcon = Library:GetCustomIcon(Data.BigIcon)
+        if ParsedIcon then
+            BigIconLabel = Library:CreateIcon(ParsedIcon, {
+                Size = UDim2.fromOffset(24, 24),
+                ImageColor3 = Data.IconColor or "AccentColor",
+                Parent = ContentContainer,
+            })
+        end
+    end
 
-	local TextContainer = New("Frame", {
-		BackgroundTransparency = 1,
-		AutomaticSize = Enum.AutomaticSize.XY,
-		Size = UDim2.fromOffset(0, 0),
-		Parent = ContentContainer,
-	})
-	New("UIListLayout", {
-		Padding = UDim.new(0, 4),
-		Parent = TextContainer,
-	})
+    local TextContainer = New("Frame", {
+        BackgroundTransparency = 1,
+        AutomaticSize = Enum.AutomaticSize.XY,
+        Size = UDim2.fromOffset(0, 0),
+        Parent = ContentContainer,
+    })
+    New("UIListLayout", {
+        Padding = UDim.new(0, 4),
+        Parent = TextContainer,
+    })
 
-	local TitleContainer
-	if Data.Title then
-		TitleContainer = New("Frame", {
-			BackgroundTransparency = 1,
-			Size = UDim2.fromOffset(0, 0),
-			Parent = TextContainer,
-		})
-	end
+    local TitleContainer
+    if Data.Title then
+        TitleContainer = New("Frame", {
+            BackgroundTransparency = 1,
+            Size = UDim2.fromOffset(0, 0),
+            Parent = TextContainer,
+        })
+    end
 
-	local IconLabel
-	if Data.Icon and TitleContainer then
-		local ParsedIcon = Library:GetCustomIcon(Data.Icon)
-		if ParsedIcon then
-			IconLabel = New("ImageLabel", {
-				BackgroundTransparency = 1,
-				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 0, 0.5, 1),
-				Size = UDim2.fromOffset(15, 15),
-				ImageColor3 = Data.IconColor or "FontColor",
-				Parent = TitleContainer,
-			})
-			Library:ApplyLucideIcon(IconLabel, ParsedIcon)
-		end
-	end
+    local IconLabel
+    if Data.Icon and TitleContainer then
+        local ParsedIcon = Library:GetCustomIcon(Data.Icon)
+        if ParsedIcon then
+            IconLabel = Library:CreateIcon(ParsedIcon, {
+                AnchorPoint = Vector2.new(0, 0.5),
+                Position = UDim2.new(0, 0, 0.5, 1),
+                Size = UDim2.fromOffset(15, 15),
+                ImageColor3 = Data.IconColor or "FontColor",
+                Parent = TitleContainer,
+            })
+        end
+    end
 
-	local Title, Desc
-	local TitleX, DescX = 0, 0
-	local TimerFill
+    local Title, Desc
+    local TitleX, DescX = 0, 0
+    local TimerFill
 
-	if Data.Title then
-		Title = New("TextLabel", {
-			AutomaticSize = Enum.AutomaticSize.None,
-			BackgroundTransparency = 1,
-			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, (IconLabel and 21 or 0), 0.5, 0),
-			Size = UDim2.fromScale(0, 0),
-			Text = Data.Title,
-			TextColor3 = Data.TitleColor or "FontColor",
-			TextSize = 15,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextYAlignment = Enum.TextYAlignment.Center,
-			TextWrapped = true,
-			Parent = TitleContainer,
-		})
-	end
+    if Data.Title then
+        Title = New("TextLabel", {
+            AutomaticSize = Enum.AutomaticSize.None,
+            BackgroundTransparency = 1,
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, (IconLabel and 21 or 0), 0.5, 0),
+            Size = UDim2.fromScale(0, 0),
+            Text = Data.Title,
+            TextColor3 = Data.TitleColor or "FontColor",
+            TextSize = 15,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            TextWrapped = true,
+            Parent = TitleContainer,
+        })
+    end
 
-	if Data.Description then
-		Desc = New("TextLabel", {
-			AutomaticSize = Enum.AutomaticSize.None,
-			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(0, 0),
-			Text = Data.Description,
-			TextColor3 = Data.DescriptionColor or "FontColor",
-			TextSize = 14,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextWrapped = true,
-			Parent = TextContainer,
-		})
-	end
+    if Data.Description then
+        Desc = New("TextLabel", {
+            AutomaticSize = Enum.AutomaticSize.None,
+            BackgroundTransparency = 1,
+            Size = UDim2.fromScale(0, 0),
+            Text = Data.Description,
+            TextColor3 = Data.DescriptionColor or "FontColor",
+            TextSize = 14,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextWrapped = true,
+            Parent = TextContainer,
+        })
+    end
 
-	function Data:Resize()
-		local ExtraWidth = BigIconLabel and 32 or 0
-		local IconWidth = IconLabel and 21 or 0
-		local CloseWidth = Data.Closable and 20 or 0
-		local MaxTextWidth = math.max(
-			40,
-			(NotificationArea.AbsoluteSize.X / Library.DPIScale) - 24 - ExtraWidth - CloseWidth
-		)
+    function Data:Resize()
+        local ExtraWidth = BigIconLabel and 32 or 0
+        local IconWidth = IconLabel and 21 or 0
+        local CloseWidth = Data.Closable and 20 or 0
+        local MaxTextWidth = math.max(
+            40,
+            (NotificationArea.AbsoluteSize.X / Library.DPIScale) - 24 - ExtraWidth - CloseWidth
+        )
 
-		if Title then
-			local X, Y = Library:GetTextBounds(Title.Text, Title.FontFace, Title.TextSize, MaxTextWidth - IconWidth)
-			Title.Size = UDim2.fromOffset(X, Y)
-			TitleX = X + IconWidth
-			TitleContainer.Size = UDim2.fromOffset(TitleX, math.max(Y, IconLabel and 16 or 0))
-		end
+        if Title then
+            local X, Y = Library:GetTextBounds(Title.Text, Title.FontFace, Title.TextSize, MaxTextWidth - IconWidth)
+            Title.Size = UDim2.fromOffset(X, Y)
+            TitleX = X + IconWidth
+            TitleContainer.Size = UDim2.fromOffset(TitleX, math.max(Y, IconLabel and 16 or 0))
+        end
 
-		if Desc then
-			local X, Y = Library:GetTextBounds(Desc.Text, Desc.FontFace, Desc.TextSize, MaxTextWidth)
-			Desc.Size = UDim2.fromOffset(X, Y)
-			DescX = X
-		end
+        if Desc then
+            local X, Y = Library:GetTextBounds(Desc.Text, Desc.FontFace, Desc.TextSize, MaxTextWidth)
+            Desc.Size = UDim2.fromOffset(X, Y)
+            DescX = X
+        end
 
-		FakeBackground.Size = UDim2.fromOffset(math.max(TitleX, DescX) + 24 + ExtraWidth + CloseWidth, 0)
+        FakeBackground.Size = UDim2.fromOffset(math.max(TitleX, DescX) + 24 + ExtraWidth + CloseWidth, 0)
 
-		if Library.Notifications[FakeBackground] then
-			task.defer(function()
-				if Data.Destroyed or not FakeBackground.Parent then
-					return
-				end
-				if FakeBackground.AbsoluteSize.Y <= 0 then
-					task.defer(function()
-						if not Data.Destroyed and FakeBackground.Parent then
-							Library:UpdateNotificationPositions(true)
-						end
-					end)
-					return
-				end
-				Library:UpdateNotificationPositions(true)
-			end)
-		end
-	end
+        if Library.Notifications[FakeBackground] then
+            task.defer(function()
+                if Data.Destroyed or not FakeBackground.Parent then
+                    return
+                end
+                if FakeBackground.AbsoluteSize.Y <= 0 then
+                    task.defer(function()
+                        if not Data.Destroyed and FakeBackground.Parent then
+                            Library:UpdateNotificationPositions(true)
+                        end
+                    end)
+                    return
+                end
+                Library:UpdateNotificationPositions(true)
+            end)
+        end
+    end
 
-	function Data:ChangeTitle(Text)
-		if Title then
-			Data.Title = tostring(Text)
-			Title.Text = Data.Title
-			Data:Resize()
-		end
-	end
+    function Data:ChangeTitle(Text)
+        if Title then
+            Data.Title = tostring(Text)
+            Title.Text = Data.Title
+            Data:Resize()
+        end
+    end
 
-	function Data:ChangeDescription(Text)
-		if Desc then
-			Data.Description = tostring(Text)
-			Desc.Text = Data.Description
-			Data:Resize()
-		end
-	end
+    function Data:ChangeDescription(Text)
+        if Desc then
+            Data.Description = tostring(Text)
+            Desc.Text = Data.Description
+            Data:Resize()
+        end
+    end
 
-	function Data:ChangeStep(NewStep)
-		if TimerFill and Data.Steps then
-			NewStep = math.clamp(NewStep or 0, 0, Data.Steps)
-			TimerFill.Size = UDim2.fromScale(NewStep / Data.Steps, 1)
-		end
-	end
+    function Data:ChangeStep(NewStep)
+        if TimerFill and Data.Steps then
+            NewStep = math.clamp(NewStep or 0, 0, Data.Steps)
+            TimerFill.Size = UDim2.fromScale(NewStep / Data.Steps, 1)
+        end
+    end
 
-	function Data:Destroy(Reason)
-		if Data.Destroyed then
-			return
-		end
+    function Data:Destroy(Reason)
+        if Data.Destroyed then
+            return
+        end
 
-		Reason = Reason or "script"
-		Data.Destroyed = true
+        Reason = Reason or "script"
+        Data.Destroyed = true
 
-		if Data.Callback then
-			pcall(Data.Callback, Reason)
-		end
+        if Data.Callback then
+            pcall(Data.Callback, Reason)
+        end
 
-		if typeof(Data.Time) == "Instance" then
-			pcall(Data.Time.Destroy, Data.Time)
-		end
+        if typeof(Data.Time) == "Instance" then
+            pcall(Data.Time.Destroy, Data.Time)
+        end
 
-		if DeleteConnection then
-			DeleteConnection:Disconnect()
-		end
+        if DeleteConnection then
+            DeleteConnection:Disconnect()
+        end
 
-		if FakeBackground then
-			local Idx = table.find(NotifyOrder, FakeBackground)
-			if Idx then
-				table.remove(NotifyOrder, Idx)
-			end
-		end
+        if FakeBackground then
+            local Idx = table.find(NotifyOrder, FakeBackground)
+            if Idx then
+                table.remove(NotifyOrder, Idx)
+            end
+        end
 
-		Library:UpdateNotificationPositions()
+        Library:UpdateNotificationPositions()
 
-		TweenService:Create(Holder, Library.NotifyTweenInfo, {
-			Position = Library.NotifySide:lower() == "left" and UDim2.new(-1, -8, 0, -2) or UDim2.new(1, 8, 0, -2),
-		}):Play()
+        TweenService:Create(Holder, Library.NotifyTweenInfo, {
+            Position = Library.NotifySide:lower() == "left" and UDim2.new(-1, -8, 0, -2) or UDim2.new(1, 8, 0, -2),
+        }):Play()
 
-		task.delay(Library.NotifyTweenInfo.Time, function()
-			Library.Notifications[FakeBackground] = nil
-			FakeBackground:Destroy()
-		end)
-	end
+        task.delay(Library.NotifyTweenInfo.Time, function()
+            Library.Notifications[FakeBackground] = nil
+            FakeBackground:Destroy()
+        end)
+    end
 
-	local TimerHolder = New("Frame", {
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 7),
-		Visible = (Data.Persist ~= true and typeof(Data.Time) ~= "Instance") or typeof(Data.Steps) == "number",
-		Parent = ContentHolder,
-	})
-	local TimerBar = New("Frame", {
-		BackgroundColor3 = "BackgroundColor",
-		BorderColor3 = "OutlineColor",
-		BorderSizePixel = 1,
-		Position = UDim2.fromOffset(0, 3),
-		Size = UDim2.new(1, 0, 0, 2),
-		Parent = TimerHolder,
-	})
-	TimerFill = New("Frame", {
-		BackgroundColor3 = "AccentColor",
-		Size = UDim2.fromScale(1, 1),
-		Parent = TimerBar,
-	})
+    local TimerHolder = New("Frame", {
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 7),
+        Visible = (Data.Persist ~= true and typeof(Data.Time) ~= "Instance") or typeof(Data.Steps) == "number",
+        Parent = ContentHolder,
+    })
+    local TimerBar = New("Frame", {
+        BackgroundColor3 = "BackgroundColor",
+        BorderColor3 = "OutlineColor",
+        BorderSizePixel = 1,
+        Position = UDim2.fromOffset(0, 3),
+        Size = UDim2.new(1, 0, 0, 2),
+        Parent = TimerHolder,
+    })
+    TimerFill = New("Frame", {
+        BackgroundColor3 = "AccentColor",
+        Size = UDim2.fromScale(1, 1),
+        Parent = TimerBar,
+    })
 
-	if typeof(Data.Time) == "Instance" then
-		TimerFill.Size = UDim2.fromScale(0, 1)
-	end
+    if typeof(Data.Time) == "Instance" then
+        TimerFill.Size = UDim2.fromScale(0, 1)
+    end
 
-	if Data.SoundId and Data.SoundId ~= false then
-		local SoundId = Data.SoundId
-		if typeof(SoundId) == "number" then
-			SoundId = string.format("rbxassetid://%d", SoundId)
-		end
-		New("Sound", {
-			SoundId = SoundId,
-			Volume = tonumber(Data.Volume) or 3,
-			PlayOnRemove = true,
-			Parent = SoundService,
-		}):Destroy()
-	end
+    if Data.SoundId and Data.SoundId ~= false then
+        local SoundId = Data.SoundId
+        if typeof(SoundId) == "number" then
+            SoundId = string.format("rbxassetid://%d", SoundId)
+        end
+        New("Sound", {
+            SoundId = SoundId,
+            Volume = tonumber(Data.Volume) or 3,
+            PlayOnRemove = true,
+            Parent = SoundService,
+        }):Destroy()
+    end
 
-	Data.Holder = Holder
-	table.insert(NotifyOrder, FakeBackground)
-	Library.Notifications[FakeBackground] = Data
+    Data.Holder = Holder
+    table.insert(NotifyOrder, FakeBackground)
+    Library.Notifications[FakeBackground] = Data
 
-	Data:Resize()
+    Data:Resize()
 
-	FakeBackground.Visible = true
-	TweenService:Create(Holder, Library.NotifyTweenInfo, {
-		Position = UDim2.fromOffset(0, 0),
-	}):Play()
+    FakeBackground.Visible = true
+    TweenService:Create(Holder, Library.NotifyTweenInfo, {
+        Position = UDim2.fromOffset(0, 0),
+    }):Play()
 
-	task.defer(function()
-		if not Data.Destroyed then
-			Library:UpdateNotificationPositions(true)
-		end
-	end)
+    task.defer(function()
+        if not Data.Destroyed then
+            Library:UpdateNotificationPositions(true)
+        end
+    end)
 
-	task.delay(Library.NotifyTweenInfo.Time, function()
-		if Data.Persist then
-			return
-		elseif typeof(Data.Time) == "Instance" then
-			repeat
-				task.wait()
-			until DeletedInstance or Data.Destroyed
-		else
-			TweenService:Create(TimerFill, TweenInfo.new(Data.Time, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), {
-				Size = UDim2.fromScale(0, 1),
-			}):Play()
-			task.wait(Data.Time)
-		end
+    task.delay(Library.NotifyTweenInfo.Time, function()
+        if Data.Persist then
+            return
+        elseif typeof(Data.Time) == "Instance" then
+            repeat
+                task.wait()
+            until DeletedInstance or Data.Destroyed
+        else
+            TweenService:Create(TimerFill, TweenInfo.new(Data.Time, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), {
+                Size = UDim2.fromScale(0, 1),
+            }):Play()
+            task.wait(Data.Time)
+        end
 
-		Data:Destroy("timer")
-	end)
+        Data:Destroy("timer")
+    end)
 
-	Library:AddNotificationToHistory({
-		Title = Data.Title,
-		Description = Data.Description,
-		TitleColor = Data.TitleColor,
-		DescriptionColor = Data.DescriptionColor,
-		Icon = Data.Icon,
-		IconColor = Data.IconColor,
-		Type = Data.Type,
-	})
+    Library:AddNotificationToHistory({
+        Title = Data.Title,
+        Description = Data.Description,
+        TitleColor = Data.TitleColor,
+        DescriptionColor = Data.DescriptionColor,
+        Icon = Data.Icon,
+        IconColor = Data.IconColor,
+        Type = Data.Type,
+    })
 
-	return Data
+    return Data
 end
 
 function Library:AddNotificationToHistory(Entry)
@@ -15892,12 +15881,22 @@ function Library:CreateWindow(WindowInfo)
                     return AddTabbox(self, BoxInfo)
                 end
 
-                function Tab:AddLeftTabbox(BoxName: string?)
-                    return Tab:AddTabbox({ Side = 1, Name = BoxName })
+                function Tab:AddLeftTabbox(...)
+                    local First = select(1, ...)
+                    if typeof(First) == "table" then
+                        First.Side = 1
+                        return Tab:AddTabbox(First)
+                    end
+                    return Tab:AddTabbox({ Side = 1, Name = First })
                 end
 
-                function Tab:AddRightTabbox(BoxName: string?)
-                    return Tab:AddTabbox({ Side = 2, Name = BoxName })
+                function Tab:AddRightTabbox(...)
+                    local First = select(1, ...)
+                    if typeof(First) == "table" then
+                        First.Side = 2
+                        return Tab:AddTabbox(First)
+                    end
+                    return Tab:AddTabbox({ Side = 2, Name = First })
                 end
 
                 function Tab:AddGroupbox(BoxInfo: { [string]: any })
@@ -16313,12 +16312,22 @@ function Library:CreateWindow(WindowInfo)
                     return Groupbox
                 end
 
-                function Tab:AddLeftGroupbox(GroupName: string?, IconName: string?, Visible: boolean?, Collapsed: boolean?, DisableCollapsing: boolean?)
-                    return Tab:AddGroupbox({ Side = 1, Name = GroupName, IconName = IconName, Visible = Visible, Collapsed = Collapsed, DisableCollapsing = DisableCollapsing })
+                function Tab:AddLeftGroupbox(...)
+                    local First = select(1, ...)
+                    if typeof(First) == "table" then
+                        First.Side = 1
+                        return Tab:AddGroupbox(First)
+                    end
+                    return Tab:AddGroupbox({ Side = 1, Name = First, IconName = select(2, ...), Visible = select(3, ...), Collapsed = select(4, ...), DisableCollapsing = select(5, ...) })
                 end
 
-                function Tab:AddRightGroupbox(GroupName: string?, IconName: string?, Visible: boolean?, Collapsed: boolean?, DisableCollapsing: boolean?)
-                    return Tab:AddGroupbox({ Side = 2, Name = GroupName, IconName = IconName, Visible = Visible, Collapsed = Collapsed, DisableCollapsing = DisableCollapsing })
+                function Tab:AddRightGroupbox(...)
+                    local First = select(1, ...)
+                    if typeof(First) == "table" then
+                        First.Side = 2
+                        return Tab:AddGroupbox(First)
+                    end
+                    return Tab:AddGroupbox({ Side = 2, Name = First, IconName = select(2, ...), Visible = select(3, ...), Collapsed = select(4, ...), DisableCollapsing = select(5, ...) })
                 end
 
                 local function IsActive()
