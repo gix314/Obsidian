@@ -267,7 +267,12 @@ local ElementParser = {}; do
     CreateParser(
         "Groupbox", "Tabs",
         function(Index: string, Groupbox: any, TabIndex: string)
-            return { collapsed = Groupbox.Collapsed, tabIdx = TabIndex }
+            return {
+                tabIdx = TabIndex,
+                collapsed = Groupbox.Collapsed,
+                poppedOut = Groupbox.PoppedOut == true,
+                popoutPos = if Groupbox.PoppedOut and Groupbox.PopOutFloat then SpecialValueParser.UDim2.Encode(Groupbox.PopOutFloat.Position) else nil,
+            }
         end,
         function(_, Data: any)
             local TabIndex, Index = Data.tabIdx, Data.idx
@@ -278,9 +283,52 @@ local ElementParser = {}; do
             if not Tab then return end
 
             local Groupbox = Tab.Groupboxes[Index]
-            if not Groupbox or Groupbox.Collapsed == Data.collapsed then return end
+            if not Groupbox then return end
 
-            Groupbox:SetCollapsed(Data.collapsed == true)
+            if Groupbox.Collapsed ~= Data.collapsed then
+                Groupbox:SetCollapsed(Data.collapsed == true)
+            end
+
+            if Groupbox.PopOutEnabled then
+                if Data.poppedOut == true then
+                    local Position = SpecialValueParser.UDim2.Decode(Data.popoutPos)
+                    Groupbox:SetPoppedOut(true, Position)
+                elseif Groupbox.PoppedOut then
+                    Groupbox:SetPoppedOut(false)
+                end
+            end
+        end,
+        true
+    )
+
+    CreateParser(
+        "Tabbox", "Tabs",
+        function(Index: string, Tabbox: any, TabIndex: string)
+            return {
+                tabIdx = TabIndex,
+                poppedOut = Tabbox.PoppedOut == true,
+                popoutPos = if Tabbox.PoppedOut and Tabbox.PopOutFloat then SpecialValueParser.UDim2.Encode(Tabbox.PopOutFloat.Position) else nil,
+            }
+        end,
+        function(_, Data: any)
+            local TabIndex, Index = Data.tabIdx, Data.idx
+            if typeof(TabIndex) ~= "string" or typeof(Index) ~= "string" then return end
+
+            local Tabs = SaveManager.Library and SaveManager.Library.Tabs
+            local Tab = Tabs and Tabs[TabIndex]
+            if not Tab then return end
+
+            local Tabbox = Tab.Tabboxes and Tab.Tabboxes[Index]
+            if not Tabbox then return end
+
+            if Tabbox.PopOutEnabled then
+                if Data.poppedOut == true then
+                    local Position = SpecialValueParser.UDim2.Decode(Data.popoutPos)
+                    Tabbox:SetPoppedOut(true, Position)
+                elseif Tabbox.PoppedOut then
+                    Tabbox:SetPoppedOut(false)
+                end
+            end
         end,
         true
     )
@@ -370,7 +418,7 @@ end
 function SaveManager:IgnoreThemeSettings()
     SaveManager:SetIgnoreIndexes({
         "BackgroundColor", "MainColor", "AccentColor", "OutlineColor", "FontColor", "FontFace", "BackgroundImage",
-        "ThemeManager_ThemeList", "ThemeManager_CustomThemeList", "ThemeManager_CustomThemeName"
+        "ThemeManager_ThemeList", "ThemeManager_CustomThemeList", "ThemeManager_CustomThemeName", "ThemeManager_ThemeJSON"
     })
 end
 
@@ -470,35 +518,40 @@ function SaveManager:RefreshConfigList()
 	return ns
 end
 
-function SaveManager:Save(ConfigName: string): (boolean, string?)
-    if IsStringEmpty(ConfigName) then
-        return false, "Invalid config name provided"
-    end
-
-    if string.lower(ConfigName) == "autoload" then
-        return false, "Invalid config name provided"
-    end
-
-    local ConfigPath = GetConfigPath(ConfigName)
-    if ConfigPath == false then
-        return false, "Invalid config name provided"
-    end
-
-    SaveManager.CurrentConfig = ConfigName
-    SaveManager:CheckFolderTree()
-
+function SaveManager:SaveJSON(ConfigName: string?): (string, boolean, string?)
     local Library = SaveManager.Library
     local IgnoreIndexes = SaveManager.Ignore
     local CurrentData = {
         timestamp = os.date("%d.%m.%Y %H:%M:%S"),
-        name = ConfigName,
+        name = ConfigName or "",
 
         objects = {},
-        keybindMenu = if Library.KeybindFrame then {
-            visible = Library.KeybindFrame.Visible,
-            position = SpecialValueParser.UDim2.Encode(Library.KeybindFrame.Position)
-        } else nil
+        keybindMenu = nil,
     }
+
+    if Library.KeybindFrame then
+        local Hidden = {}
+        for Index, Option in Library.Options do
+            if Option.Type == "KeyPicker" and Option.NoUI ~= true and Option.MenuVisible == false then
+                Hidden[Index] = true
+            end
+        end
+
+        local KeybindMenu = Library.KeybindMenu
+        local SettingsPosition = nil
+        if KeybindMenu and KeybindMenu.SettingsFrame then
+            SettingsPosition = SpecialValueParser.UDim2.Encode(KeybindMenu.SettingsFrame.Position)
+        end
+
+        CurrentData.keybindMenu = {
+            visible = Library.KeybindFrame.Visible,
+            position = SpecialValueParser.UDim2.Encode(Library.KeybindFrame.Position),
+            collapsed = if KeybindMenu then KeybindMenu.Collapsed == true else false,
+            settingsOpen = false,
+            settingsPosition = SettingsPosition,
+            hidden = Hidden,
+        }
+    end
 
     for Index, Toggle in Library.Toggles do
         if not Toggle.Type then continue end
@@ -521,50 +574,43 @@ function SaveManager:Save(ConfigName: string): (boolean, string?)
     end
 
     for TabIndex, Tab in Library.Tabs do
-        if not Tab.Groupboxes then continue end
+        if Tab.Groupboxes then
+            for Index, Groupbox in Tab.Groupboxes do
+                if typeof(Index) ~= "string" or IgnoreIndexes[Index] then continue end
 
-        for Index, Groupbox in Tab.Groupboxes do
-            if IgnoreIndexes[Index] then continue end
+                local Parser = ElementParser.Groupbox
+                if not Parser then continue end
 
-            local Parser = ElementParser.Groupbox
-            if not Parser then continue end
+                table.insert(CurrentData.objects, Parser.Save(Index, Groupbox, TabIndex))
+            end
+        end
 
-            table.insert(CurrentData.objects, Parser.Save(Index, Groupbox, TabIndex))
+        if Tab.Tabboxes then
+            for Index, Tabbox in Tab.Tabboxes do
+                if typeof(Index) ~= "string" or IgnoreIndexes[Index] then continue end
+
+                local Parser = ElementParser.Tabbox
+                if not Parser then continue end
+
+                table.insert(CurrentData.objects, Parser.Save(Index, Tabbox, TabIndex))
+            end
         end
     end
 
     local SuccessEncode, EncodedData = pcall(HttpService.JSONEncode, HttpService, CurrentData)
     if not SuccessEncode then
-        return false, "Failed to encode data"
+        return "", false, "Failed to encode data"
     end
 
-    local SuccessWrite, ErrorMessage = pcall(writefile, ConfigPath, EncodedData)
-    if not SuccessWrite then
-        return false, "Failed to write config file: " .. tostring(ErrorMessage)
-    end
-
-    SaveManager.ConfigLoaded = true
-    return true
+    return EncodedData, true
 end
 
-function SaveManager:Load(ConfigName: string): (boolean, string?)
-    if IsStringEmpty(ConfigName) then
-        return false, "No config is selected"
+function SaveManager:LoadJSON(Content: string)
+    if IsStringEmpty(Content) then
+        return false, "No JSON provided"
     end
 
-    local ConfigPath = GetConfigPath(ConfigName)
-    if ConfigPath == false or not isfile(ConfigPath) then
-        return false, "Config file does not exist"
-    end
-
-    SaveManager.CurrentConfig = ConfigName
     SaveManager.LoadingConfig = true
-
-    local SuccessRead, Content = pcall(readfile, ConfigPath)
-    if not SuccessRead then
-        SaveManager.LoadingConfig = false
-        return false, "Failed to read config file"
-    end
 
     local SuccessDecode, Decoded = pcall(HttpService.JSONDecode, HttpService, Content)
     if not SuccessDecode or typeof(Decoded) ~= "table" or typeof(Decoded.objects) ~= "table" then
@@ -591,10 +637,35 @@ function SaveManager:Load(ConfigName: string): (boolean, string?)
 
         Library.KeybindFrame.Visible = IsVisible
         Library.KeybindFrame.Position = Position or Library.KeybindFrame.Position
-        
+
         local KeybindMenuToggle = Library.Options and Library.Options.KeybindMenuOpen
         if KeybindMenuToggle then
             KeybindMenuToggle:SetValue(IsVisible)
+        end
+
+        local KeybindMenu = Library.KeybindMenu
+        if KeybindMenu then
+            if KeybindMenu.SetCollapsed then
+                KeybindMenu:SetCollapsed(KeybindFrameData.collapsed == true)
+            end
+
+            if typeof(KeybindFrameData.hidden) == "table" then
+                for Index, Option in Library.Options do
+                    if Option.Type ~= "KeyPicker" or Option.NoUI == true or not Option.SetMenuVisibility then
+                        continue
+                    end
+
+                    Option:SetMenuVisibility(KeybindFrameData.hidden[Index] ~= true)
+                end
+            end
+
+            local SettingsPosition = SpecialValueParser.UDim2.Decode(KeybindFrameData.settingsPosition)
+            if SettingsPosition and KeybindMenu.SettingsFrame then
+                KeybindMenu.SettingsFrame.Position = SettingsPosition
+            end
+            if KeybindMenu.SetSettingsOpen then
+                KeybindMenu:SetSettingsOpen(false)
+            end
         end
     end
 
@@ -614,6 +685,57 @@ function SaveManager:Load(ConfigName: string): (boolean, string?)
 
     SaveManager.ConfigLoaded = true
     return true
+end
+
+function SaveManager:Save(ConfigName: string): (boolean, string?)
+    if IsStringEmpty(ConfigName) then
+        return false, "Invalid config name provided"
+    end
+
+    if string.lower(ConfigName) == "autoload" then
+        return false, "Invalid config name provided"
+    end
+
+    local ConfigPath = GetConfigPath(ConfigName)
+    if ConfigPath == false then
+        return false, "Invalid config name provided"
+    end
+
+    SaveManager.CurrentConfig = ConfigName
+    SaveManager:CheckFolderTree()
+
+    local EncodedData, SuccessEncode, EncodeErrorMessage = SaveManager:SaveJSON(ConfigName)
+    if not SuccessEncode then
+        return false, EncodeErrorMessage
+    end
+
+    local SuccessWrite, ErrorMessage = pcall(writefile, ConfigPath, EncodedData)
+    if not SuccessWrite then
+        return false, "Failed to write config file: " .. tostring(ErrorMessage)
+    end
+
+    SaveManager.ConfigLoaded = true
+    return true
+end
+
+function SaveManager:Load(ConfigName: string): (boolean, string?)
+    if IsStringEmpty(ConfigName) then
+        return false, "No config is selected"
+    end
+
+    local ConfigPath = GetConfigPath(ConfigName)
+    if ConfigPath == false or not isfile(ConfigPath) then
+        return false, "Config file does not exist"
+    end
+
+    SaveManager.CurrentConfig = ConfigName
+
+    local SuccessRead, Content = pcall(readfile, ConfigPath)
+    if not SuccessRead then
+        return false, "Failed to read config file"
+    end
+
+    return SaveManager:LoadJSON(Content)
 end
 
 function SaveManager:Delete(ConfigName: string): (boolean | string?)
@@ -1037,37 +1159,8 @@ function SaveManager:ExportConfig(ConfigName: string?): (boolean, string?)
 
 	local cfg = ConfigName or SaveManager.CurrentConfig
 	if IsStringEmpty(cfg) then
-		local lib = SaveManager.Library
-		local IgnoreIndexes = SaveManager.Ignore
-		local CurrentData = {
-			timestamp = os.date("%d.%m.%Y %H:%M:%S"),
-			name = "exported_config",
-			objects = {},
-			keybindMenu = if lib.KeybindFrame then {
-				visible = lib.KeybindFrame.Visible,
-				position = SpecialValueParser.UDim2.Encode(lib.KeybindFrame.Position)
-			} else nil
-		}
-		for Index, Toggle in lib.Toggles do
-			if not Toggle.Type or IgnoreIndexes[Index] then continue end
-			local Parser = ElementParser[Toggle.Type]
-			if Parser then table.insert(CurrentData.objects, Parser.Save(Index, Toggle)) end
-		end
-		for Index, Option in lib.Options do
-			if not Option.Type or IgnoreIndexes[Index] then continue end
-			local Parser = ElementParser[Option.Type]
-			if Parser then table.insert(CurrentData.objects, Parser.Save(Index, Option)) end
-		end
-		for TabIndex, Tab in lib.Tabs do
-			if not Tab.Groupboxes then continue end
-			for Index, Groupbox in Tab.Groupboxes do
-				if IgnoreIndexes[Index] then continue end
-				local Parser = ElementParser.Groupbox
-				if Parser then table.insert(CurrentData.objects, Parser.Save(Index, Groupbox, TabIndex)) end
-			end
-		end
-		local ok, enc = pcall(HttpService.JSONEncode, HttpService, CurrentData)
-		if not ok then return false, "Failed to encode active settings." end
+		local enc, ok, err = SaveManager:SaveJSON("exported_config")
+		if not ok then return false, err or "Failed to encode active settings." end
 		pcall(setcb, enc)
 		return true, "Exported active settings to clipboard."
 	end
