@@ -53,7 +53,19 @@ if typeof(clonefunction) == "function" then
     end
 end
 
+local ContrastWarnThreshold = 4.5
+local SrgbLinearThreshold = 0.03928
+local SrgbLinearDivisor = 12.92
+local SrgbGammaOffset = 0.055
+local SrgbGammaScale = 1.055
+local SrgbGammaExponent = 2.4
+local LuminanceRedWeight,
+      LuminanceGreenWeight,
+      LuminanceBlueWeight = 0.2126, 0.7152, 0.0722
+local ContrastRatioOffset = 0.05
+
 local SchemeIndexes = { "FontColor", "MainColor", "AccentColor", "BackgroundColor", "OutlineColor" }
+
 local ThemeManager = {
     Library = nil,
 
@@ -62,86 +74,101 @@ local ThemeManager = {
     AppliedToTab = false,
     DefaultThemeName = nil,
 
+    ContrastLabel = nil,
+    ContrastWasPoor = false,
+
     BuiltInThemes = {
         ["Default"] = {
             1,
-            { FontColor = "f5efea", MainColor = "282020", AccentColor = "e85a3c", BackgroundColor = "1a1414", OutlineColor = "3e3232" }
+            { FontColor = "ffffff", MainColor = "191919", AccentColor = "7d55ff", BackgroundColor = "0f0f0f", OutlineColor = "282828", BackgroundImage = "" },
         },
-        ["Dracula"] = {
+        ["BBot"] = {
             2,
-            { FontColor = "f8f8f2", MainColor = "282a36", AccentColor = "bd93f9", BackgroundColor = "1e1f29", OutlineColor = "44475a" }
+            { FontColor = "ffffff", MainColor = "1e1e1e", AccentColor = "7e48a3", BackgroundColor = "232323", OutlineColor = "141414", BackgroundImage = "" },
         },
-        ["Nord"] = {
+        ["Fatality"] = {
             3,
-            { FontColor = "eceff4", MainColor = "2e3440", AccentColor = "88c0d0", BackgroundColor = "242933", OutlineColor = "434c5e" }
+            { FontColor = "ffffff", MainColor = "1e1842", AccentColor = "c50754", BackgroundColor = "191335", OutlineColor = "3c355d", BackgroundImage = "" },
         },
-        ["Monokai"] = {
+        ["Jester"] = {
             4,
-            { FontColor = "f8f8f2", MainColor = "272822", AccentColor = "a6e22e", BackgroundColor = "1e1f1c", OutlineColor = "3e3d32" }
+            { FontColor = "ffffff", MainColor = "242424", AccentColor = "db4467", BackgroundColor = "1c1c1c", OutlineColor = "373737", BackgroundImage = "" },
         },
-        ["Rose Pine"] = {
+        ["Mint"] = {
             5,
-            { FontColor = "e0def4", MainColor = "1f1d2e", AccentColor = "eb6f92", BackgroundColor = "191724", OutlineColor = "26233a" }
+            { FontColor = "ffffff", MainColor = "242424", AccentColor = "3db488", BackgroundColor = "1c1c1c", OutlineColor = "373737", BackgroundImage = "" },
         },
         ["Tokyo Night"] = {
             6,
-            { FontColor = "c0caf5", MainColor = "1f2335", AccentColor = "7aa2f7", BackgroundColor = "1a1b26", OutlineColor = "292e42" }
+            { FontColor = "ffffff", MainColor = "191925", AccentColor = "6759b3", BackgroundColor = "16161f", OutlineColor = "323232", BackgroundImage = "" },
+        },
+        ["Ubuntu"] = {
+            7,
+            { FontColor = "ffffff", MainColor = "3e3e3e", AccentColor = "e2581e", BackgroundColor = "323232", OutlineColor = "191919", BackgroundImage = "" },
+        },
+        ["Quartz"] = {
+            8,
+            { FontColor = "ffffff", MainColor = "232330", AccentColor = "426e87", BackgroundColor = "1d1b26", OutlineColor = "27232f", BackgroundImage = "" },
+        },
+        ["Nord"] = {
+            9,
+            { FontColor = "eceff4", MainColor = "3b4252", AccentColor = "88c0d0", BackgroundColor = "2e3440", OutlineColor = "4c566a", BackgroundImage = "" },
+        },
+        ["Dracula"] = {
+            10,
+            { FontColor = "f8f8f2", MainColor = "44475a", AccentColor = "ff79c6", BackgroundColor = "282a36", OutlineColor = "6272a4", BackgroundImage = "" },
+        },
+        ["Monokai"] = {
+            11,
+            { FontColor = "f8f8f2", MainColor = "272822", AccentColor = "f92672", BackgroundColor = "1e1f1c", OutlineColor = "49483e", BackgroundImage = "" },
         },
         ["Gruvbox"] = {
-            7,
-            { FontColor = "ebdbb2", MainColor = "32302f", AccentColor = "fe8019", BackgroundColor = "282828", OutlineColor = "504945" }
+            12,
+            { FontColor = "ebdbb2", MainColor = "3c3836", AccentColor = "fb4934", BackgroundColor = "282828", OutlineColor = "504945", BackgroundImage = "" },
+        },
+        ["Solarized"] = {
+            13,
+            { FontColor = "839496", MainColor = "073642", AccentColor = "cb4b16", BackgroundColor = "002b36", OutlineColor = "586e75", BackgroundImage = "" },
         },
         ["Catppuccin"] = {
-            8,
-            { FontColor = "cdd6f4", MainColor = "1e1e2e", AccentColor = "cba6f7", BackgroundColor = "181825", OutlineColor = "313244" }
+            14,
+            { FontColor = "d9e0ee", MainColor = "302d41", AccentColor = "f5c2e7", BackgroundColor = "1e1e2e", OutlineColor = "575268", BackgroundImage = "" },
         },
         ["One Dark"] = {
-            9,
-            { FontColor = "abb2bf", MainColor = "282c34", AccentColor = "61afef", BackgroundColor = "21252b", OutlineColor = "3e4451" }
+            15,
+            { FontColor = "abb2bf", MainColor = "282c34", AccentColor = "c678dd", BackgroundColor = "21252b", OutlineColor = "5c6370", BackgroundImage = "" },
         },
         ["Cyberpunk"] = {
-            10,
-            { FontColor = "f8f8f2", MainColor = "1f1b2e", AccentColor = "00ff9f", BackgroundColor = "14121f", OutlineColor = "3a2d54" }
-        },
-        ["Solarized Dark"] = {
-            11,
-            { FontColor = "93a1a1", MainColor = "073642", AccentColor = "2aa198", BackgroundColor = "002b36", OutlineColor = "094959" }
+            16,
+            { FontColor = "f9f9f9", MainColor = "262335", AccentColor = "00ff9f", BackgroundColor = "1a1a2e", OutlineColor = "413c5e", BackgroundImage = "" },
         },
         ["Oceanic Next"] = {
-            12,
-            { FontColor = "d8dee9", MainColor = "1b2b34", AccentColor = "6699cc", BackgroundColor = "16232a", OutlineColor = "343d46" }
+            17,
+            { FontColor = "d8dee9", MainColor = "1b2b34", AccentColor = "6699cc", BackgroundColor = "16232a", OutlineColor = "343d46", BackgroundImage = "" },
         },
-        ["Synthetic Violet"] = {
-            13,
-            { FontColor = "f3e8ff", MainColor = "221b35", AccentColor = "a855f7", BackgroundColor = "161124", OutlineColor = "3b2d5a" }
+        ["Material"] = {
+            18,
+            { FontColor = "eeffff", MainColor = "212121", AccentColor = "82aaff", BackgroundColor = "151515", OutlineColor = "424242", BackgroundImage = "" },
+        },
+        ["Rose Pine"] = {
+            19,
+            { FontColor = "e0def4", MainColor = "1f1d2e", AccentColor = "eb6f92", BackgroundColor = "191724", OutlineColor = "26233a", BackgroundImage = "" },
         },
         ["Emerald"] = {
-            14,
-            { FontColor = "e8f5e9", MainColor = "1b2921", AccentColor = "10b981", BackgroundColor = "111c16", OutlineColor = "284033" }
+            20,
+            { FontColor = "e8f5e9", MainColor = "1b2921", AccentColor = "10b981", BackgroundColor = "111c16", OutlineColor = "284033", BackgroundImage = "" },
         },
         ["Crimson"] = {
-            15,
-            { FontColor = "fde8e8", MainColor = "2b1818", AccentColor = "ef4444", BackgroundColor = "1a0d0d", OutlineColor = "4a2626" }
-        },
-        ["Midnight"] = {
-            16,
-            { FontColor = "e2e8f0", MainColor = "151e2e", AccentColor = "38bdf8", BackgroundColor = "0b0f17", OutlineColor = "24334d" }
+            21,
+            { FontColor = "fde8e8", MainColor = "2b1818", AccentColor = "ef4444", BackgroundColor = "1a0d0d", OutlineColor = "4a2626", BackgroundImage = "" },
         },
         ["Amber Gold"] = {
-            17,
-            { FontColor = "fef3c7", MainColor = "2c2317", AccentColor = "f59e0b", BackgroundColor = "1c160e", OutlineColor = "4d3c24" }
+            22,
+            { FontColor = "fef3c7", MainColor = "2c2317", AccentColor = "f59e0b", BackgroundColor = "1c160e", OutlineColor = "4d3c24", BackgroundImage = "" },
         },
         ["Abyss"] = {
-            18,
-            { FontColor = "d1d5db", MainColor = "161b22", AccentColor = "58a6ff", BackgroundColor = "0d1117", OutlineColor = "30363d" }
-        },
-        ["Bubblegum"] = {
-            19,
-            { FontColor = "fdf2f8", MainColor = "2e1a29", AccentColor = "f472b6", BackgroundColor = "1f111b", OutlineColor = "4a2942" }
-        },
-        ["Slate"] = {
-            20,
-            { FontColor = "f1f5f9", MainColor = "1e293b", AccentColor = "cbd5e1", BackgroundColor = "0f172a", OutlineColor = "334155" }
+            23,
+            { FontColor = "d1d5db", MainColor = "161b22", AccentColor = "58a6ff", BackgroundColor = "0d1117", OutlineColor = "30363d", BackgroundImage = "" },
         }
     }
 }
@@ -165,6 +192,47 @@ local function IsValidFolderPath(Name: string): boolean
         not Name:match("^%s*$") and 
         not Name:find('[<>:"|%?%*%z]')
     )
+end
+
+--// Contrast helpers \\--
+local function LinearizeChannel(Channel: number): number
+    if Channel <= SrgbLinearThreshold then
+        return Channel / SrgbLinearDivisor
+    end
+
+    return ((Channel + SrgbGammaOffset) / SrgbGammaScale) ^ SrgbGammaExponent
+end
+
+local function GetRelativeLuminance(Color: Color3): number
+    local R = LinearizeChannel(Color.R)
+    local G = LinearizeChannel(Color.G)
+    local B = LinearizeChannel(Color.B)
+
+    return LuminanceRedWeight * R + LuminanceGreenWeight * G + LuminanceBlueWeight * B
+end
+
+local function GetContrastRatio(ColorA: Color3, ColorB: Color3): number
+    local LuminanceA = GetRelativeLuminance(ColorA)
+    local LuminanceB = GetRelativeLuminance(ColorB)
+
+    local Lighter = math.max(LuminanceA, LuminanceB)
+    local Darker = math.min(LuminanceA, LuminanceB)
+
+    return (Lighter + ContrastRatioOffset) / (Darker + ContrastRatioOffset)
+end
+
+local function IsValidThemeData(Data: any): boolean
+    if typeof(Data) ~= "table" then
+        return false
+    end
+
+    for _, SchemeIndex in SchemeIndexes do
+        if typeof(Data[SchemeIndex]) ~= "string" then
+            return false
+        end
+    end
+
+    return true
 end
 
 --// Folder helper \\--
@@ -299,6 +367,31 @@ function ThemeManager:GetCustomTheme(ThemeName: string): any
     return Decoded
 end
 
+local function BuildCurrentThemeData(): {[string]: any}
+    local Library = ThemeManager.Library
+    local ThemeData = {
+        FontFace = Library.Options.FontFace.Value,
+        BackgroundImage = Library.Options.BackgroundImage.Value
+    }
+
+    for _, SchemeIndex in SchemeIndexes do
+        ThemeData[SchemeIndex] = Library.Options[SchemeIndex].Value:ToHex()
+    end
+
+    return ThemeData
+end
+
+function ThemeManager:SaveJSON(): (string, boolean, string?)
+    local ThemeData = BuildCurrentThemeData()
+
+    local SuccessEncode, EncodedData = pcall(HttpService.JSONEncode, HttpService, ThemeData)
+    if not SuccessEncode then
+        return "", false, "Failed to encode data"
+    end
+
+    return EncodedData, true
+end
+
 function ThemeManager:SaveCustomTheme(ThemeName: string): any
     if IsStringEmpty(ThemeName) then
         return false, "Invalid theme name provided"
@@ -315,19 +408,9 @@ function ThemeManager:SaveCustomTheme(ThemeName: string): any
 
     ThemeManager:CheckFolderTree()
 
-    local Library = ThemeManager.Library
-    local ThemeData = {
-        FontFace = Library.Options.FontFace.Value,
-        BackgroundImage = Library.Options.BackgroundImage.Value
-    }
-
-    for _, SchemeIndex in SchemeIndexes do
-        ThemeData[SchemeIndex] = Library.Options[SchemeIndex].Value:ToHex()
-    end
-
-    local SuccessEncode, EncodedData = pcall(HttpService.JSONEncode, HttpService, ThemeData)
+    local EncodedData, SuccessEncode, EncodeErrorMessage = ThemeManager:SaveJSON()
     if not SuccessEncode then
-        return false, "Failed to encode data"
+        return false, EncodeErrorMessage
     end
 
     local SuccessWrite, ErrorMessage = pcall(writefile, ThemePath, EncodedData)
@@ -543,27 +626,15 @@ function ThemeManager:ThemeUpdate()
     end
 
     Library:UpdateColorsUsingRegistry()
+    ThemeManager:UpdateContrastWarning()
 end
 
-function ThemeManager:ApplyTheme(ThemeName: string)
-    if IsStringEmpty(ThemeName) then
-        return false, "No theme is selected"
+function ThemeManager:ApplyThemeData(ThemeData: any): (boolean, string?)
+    if typeof(ThemeData) ~= "table" then
+        return false, "Invalid theme data"
     end
 
-    if ThemeName == "Default" then
-        ThemeName = "Default"
-    end
-
-    local CustomThemeData = ThemeManager:GetCustomTheme(ThemeName)
-    local Data = CustomThemeData or ThemeManager.BuiltInThemes[ThemeName]
-    
-    if not Data then
-        return false, "Theme not found"
-    end
-    
     local Library = ThemeManager.Library
-    local SchemeData = Data[2]
-    local ThemeData = CustomThemeData or SchemeData
 
     for Index, Value in ThemeData do
         if Index == "VideoLink" then
@@ -574,14 +645,22 @@ function ThemeManager:ApplyTheme(ThemeName: string)
         local FinalValue = Value
 
         if Index == "FontFace" then
-            ThemeManager.Library:SetFont(Enum.Font[FinalValue])
+            if typeof(Value) ~= "string" or not Enum.Font[Value] then continue end
+            ThemeManager.Library:SetFont(Enum.Font[Value])
 
         elseif Index == "BackgroundImage" then
-            ThemeManager.Library:SetBackgroundImage(FinalValue)
+            if typeof(Value) ~= "string" then continue end
+            ThemeManager.Library:SetBackgroundImage(Value)
+
+        elseif table.find(SchemeIndexes, Index) then
+            local SuccessColor, Color = pcall(Color3.fromHex, Value)
+            if not SuccessColor then continue end
+
+            FinalValue = Color
+            Library.Scheme[Index] = FinalValue
 
         else
-            FinalValue = Color3.fromHex(Value)
-            Library.Scheme[Index] = FinalValue
+            continue
         end
 
         if Element then
@@ -591,6 +670,35 @@ function ThemeManager:ApplyTheme(ThemeName: string)
 
     ThemeManager:ThemeUpdate()
     return true
+end
+
+function ThemeManager:ApplyTheme(ThemeName: string)
+    if IsStringEmpty(ThemeName) then
+        return false, "No theme is selected"
+    end
+
+    local CustomThemeData = ThemeManager:GetCustomTheme(ThemeName)
+    local Data = CustomThemeData or ThemeManager.BuiltInThemes[ThemeName]
+    
+    if not Data then
+        return false, "Theme not found"
+    end
+    
+    local ThemeData = CustomThemeData or Data[2]
+    return ThemeManager:ApplyThemeData(ThemeData)
+end
+
+function ThemeManager:LoadJSON(Content: string): (boolean, string?)
+    if IsStringEmpty(Content) then
+        return false, "No JSON provided"
+    end
+
+    local SuccessDecode, Decoded = pcall(HttpService.JSONDecode, HttpService, Content)
+    if not SuccessDecode or not IsValidThemeData(Decoded) then
+        return false, "Failed to decode theme data"
+    end
+
+    return ThemeManager:ApplyThemeData(Decoded)
 end
 
 --// GUI \\--
@@ -644,7 +752,7 @@ function ThemeManager:CreateThemeManager(Themesbox)
         table.insert(BuiltInThemesNames, Name)
     end
 
-    local CustomThemeList, CustomThemeName, ThemeList, FontFace, BackgroundImage, DefaultThemeLabel
+    local CustomThemeList, CustomThemeName, ThemeList, FontFace, BackgroundImage, DefaultThemeLabel, ThemeJSONInput
     local function RefreshList()
         CustomThemeList:SetValues(ThemeManager:ReloadCustomThemes())
         CustomThemeList:SetValue(nil)
@@ -676,6 +784,11 @@ function ThemeManager:CreateThemeManager(Themesbox)
     local AccentColor = CreateColorOption("Accent color", "AccentColor")
     local OutlineColor = CreateColorOption("Outline color", "OutlineColor")
     local FontColor = CreateColorOption("Font color", "FontColor")
+
+    ThemeManager.ContrastLabel = Themesbox:AddLabel({
+        Text = "Contrast check: n/a",
+        DoesWrap = true,
+    })
 
     local AvailableFonts = {}
     for _, item in ipairs(Enum.Font:GetEnumItems()) do
@@ -750,6 +863,41 @@ function ThemeManager:CreateThemeManager(Themesbox)
         Text = "Custom theme name" 
     })
 
+    local function SaveThemeWithContrastCheck(Name: string, SuccessMessage: string, OnSaved: (() -> nil)?)
+        local function DoSave()
+            local Success, ErrorMessage = ThemeManager:SaveCustomTheme(Name)
+            if not Success then
+                ThemeManager.Library:Notify(string.format("Failed to save theme %q: %s", Name, ErrorMessage))
+                return
+            end
+
+            ThemeManager.Library:Notify(string.format(SuccessMessage, Name))
+            if OnSaved then OnSaved() end
+        end
+
+        local Report = ThemeManager:GetContrastReport()
+        if Report.Passes then
+            DoSave()
+            return
+        end
+
+        ShowDialog(
+            function(): boolean
+                return true
+            end,
+
+            "ThemeManager_LowContrastSave",
+            "Low contrast theme",
+            string.format(
+                "This theme has a contrast ratio of %.1f:1 between %s, below the recommended %.1f:1. Text may be hard to read. Save anyway?",
+                Report.Ratio, Report.PairName, ContrastWarnThreshold
+            ),
+
+            "Save Anyway",
+            DoSave
+        )
+    end
+
     Themesbox:AddButton("Create", function()
         local Name = CustomThemeName.Value
         if IsStringEmpty(Name) then
@@ -773,14 +921,7 @@ function ThemeManager:CreateThemeManager(Themesbox)
 
             "Overwrite",
             function()
-                local Success, ErrorMessage = ThemeManager:SaveCustomTheme(Name)
-                if not Success then
-                    ThemeManager.Library:Notify(string.format("Failed to create theme %q: %s", Name, ErrorMessage))
-                    return
-                end
-
-                ThemeManager.Library:Notify(string.format("Successfully created theme %q", Name))
-                RefreshList()
+                SaveThemeWithContrastCheck(Name, "Successfully created theme %q", RefreshList)
             end
         )
     end)
@@ -828,13 +969,7 @@ function ThemeManager:CreateThemeManager(Themesbox)
             return
         end
 
-        local Success, ErrorMessage = ThemeManager:SaveCustomTheme(Name)
-        if not Success then
-            ThemeManager.Library:Notify(string.format("Failed to overwrite theme %q: %s", Name, tostring(ErrorMessage)))
-            return
-        end
-
-        ThemeManager.Library:Notify(string.format("Successfully overwrote theme %q", Name))
+        SaveThemeWithContrastCheck(Name, "Successfully overwrote theme %q")
     end)
 
     local GBT2 = Themesbox:AddButton("Delete", function()
@@ -894,12 +1029,63 @@ function ThemeManager:CreateThemeManager(Themesbox)
 
     DefaultThemeLabel = Themesbox:AddLabel("Current default theme: ...", true)
 
-    CustomThemeList, CustomThemeName, ThemeList, FontFace, BackgroundImage =
+    Themesbox:AddDivider()
+
+    ThemeJSONInput = Themesbox:AddInput("ThemeManager_ThemeJSON", {
+        Text = "Theme JSON"
+    })
+
+    local GBT4 = Themesbox:AddButton("Import theme", function()
+        local ThemeJSON = ThemeJSONInput.Value
+        if IsStringEmpty(ThemeJSON) then
+            ThemeManager.Library:Notify("Theme JSON cannot be empty.")
+            return
+        end
+
+        ShowDialog(
+            function(): boolean
+                return true
+            end,
+
+            "ThemeManager_ImportTheme",
+            "Import theme",
+            "Are you sure you want to import this theme? Your current colors will be overwritten.",
+
+            "Import",
+            function()
+                local Success, ErrorMessage = ThemeManager:LoadJSON(ThemeJSON)
+                if not Success then
+                    ThemeManager.Library:Notify(string.format("Failed to import theme: %s", ErrorMessage))
+                    return
+                end
+
+                ThemeManager.Library:Notify("Successfully imported theme.")
+            end
+        )
+    end)
+
+    GBT4:AddButton("Export theme", function()
+        local EncodedData, Success, ErrorMessage = ThemeManager:SaveJSON()
+        if not Success then
+            ThemeManager.Library:Notify(ErrorMessage)
+            return
+        end
+
+        ThemeJSONInput:SetValue(EncodedData)
+        local setcb = setclipboard or toclipboard or set_clipboard or (Clipboard and Clipboard.set)
+        if setcb then
+            pcall(setcb, EncodedData)
+            ThemeManager.Library:Notify("Copied theme to your clipboard.")
+        end
+    end)
+
+    CustomThemeList, CustomThemeName, ThemeList, FontFace, BackgroundImage, ThemeJSONInput =
         ThemeManager.Library.Options.ThemeManager_CustomThemeList,
         ThemeManager.Library.Options.ThemeManager_CustomThemeName,
         ThemeManager.Library.Options.ThemeManager_ThemeList,
         ThemeManager.Library.Options.FontFace,
-        ThemeManager.Library.Options.BackgroundImage
+        ThemeManager.Library.Options.BackgroundImage,
+        ThemeManager.Library.Options.ThemeManager_ThemeJSON
 
     ThemeList:OnChanged(function()
         ThemeManager:ApplyTheme(ThemeList.Value)
@@ -918,6 +1104,7 @@ function ThemeManager:CreateThemeManager(Themesbox)
     BackgroundImage:OnChanged(function(Value) ThemeManager.Library:SetBackgroundImage(Value) end)
 
     ThemeManager:LoadDefault()
+    ThemeManager:UpdateContrastWarning()
     ThemeManager.AppliedToTab = true
     RefreshDefaultThemeLabel()
 
